@@ -1,0 +1,7 @@
+fastapi>=0.115,<1.0
+uvicorn>=0.30
+pandas
+networkx
+streamlit
+neo4j
+python-dotenv

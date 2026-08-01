@@ -1,0 +1,75 @@
+{
+  "dataset_name": "IBM AML-Data HI-Small Demo Subset",
+  "generated_at": "2026-07-30T14:35:21+08:00",
+  "license": "CDLA-Sharing-1.0",
+  "source": "https://www.kaggle.com/datasets/ealtman2019/ibm-transactions-for-anti-money-laundering-aml",
+  "configuration": {
+    "seed": 20260730,
+    "patterns": [
+      "CYCLE",
+      "FAN-OUT",
+      "FAN-IN",
+      "GATHER-SCATTER",
+      "SCATTER-GATHER",
+      "BIPARTITE"
+    ],
+    "cases_per_pattern": 1,
+    "context_days": 2,
+    "max_context_transactions": 3500,
+    "background_transactions": 1500
+  },
+  "statistics": {
+    "transactions": 4756,
+    "laundering_transactions": 64,
+    "normal_transactions": 4692,
+    "accounts": 3157,
+    "accounts_with_metadata": 3157,
+    "cases": 6,
+    "pattern_transaction_counts": {
+      "BIPARTITE": 8,
+      "CYCLE": 8,
+      "FAN-IN": 10,
+      "FAN-OUT": 10,
+      "GATHER-SCATTER": 14,
+      "SCATTER-GATHER": 14
+    },
+    "time_start": "2022-09-01T00:00:00",
+    "time_end": "2022-09-13T05:30:00"
+  },
+  "label_boundary": "labels.csv is for offline evaluation only. Do not load it into rule detection, risk scoring, graph analysis, or Agent tools.",
+  "source_files": [
+    {
+      "name": "HI-Small_Trans.csv",
+      "bytes": 475664283,
+      "sha256": "b19d39f515523373f991b689c07e11e7b0b95c17a2c27a87d91584ae16c5b040"
+    },
+    {
+      "name": "HI-Small_accounts.csv",
+      "bytes": 34053187,
+      "sha256": "786808526e33cfc441212dd6fccda7edfc24172149bed59c6ef59b186836b014"
+    },
+    {
+      "name": "HI-Small_Patterns.txt",
+      "bytes": 323844,
+      "sha256": "2c546b5ce6009e73851f0139af053cf845f08bf92f3bc82fe1eb937dec2ef39b"
+    }
+  ],
+  "output_files": {
+    "transactions.csv": {
+      "bytes": 451839,
+      "sha256": "3e62a04a4608d7aff4c367e6d18c8ff0c5df46014e71f62e6c92feb4ce234094"
+    },
+    "accounts.csv": {
+      "bytes": 235019,
+      "sha256": "772d7315e539927f0abd4729d83483e6d041d93ee4bc20841ca310d1e1d8471f"
+    },
+    "labels.csv": {
+      "bytes": 186626,
+      "sha256": "26fbed19550a942e14b48a74f98cd6f9437dd63aa70608e95786a8643b5daf77"
+    },
+    "cases.csv": {
+      "bytes": 566,
+      "sha256": "70dc078ffd35ebeda22e594d6a1d8d08c4ad7a987ee587752b94f4a8d6462fdd"
+    }
+  }
+}

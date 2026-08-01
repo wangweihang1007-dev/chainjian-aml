@@ -1,0 +1,11 @@
+# Runtime secrets
+backend/.env
+.env
+
+# Python caches
+__pycache__/
+*.py[cod]
+
+# Local databases and generated artifacts
+*.db
+data/cleaned/

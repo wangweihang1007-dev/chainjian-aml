@@ -1,0 +1,31 @@
+"""FastAPI endpoint for grounded AML investigations."""
+
+from __future__ import annotations
+
+import sys
+from pathlib import Path
+
+from fastapi import APIRouter, HTTPException
+from pydantic import BaseModel
+
+PROJECT_ROOT = Path(__file__).resolve().parents[2]
+sys.path.insert(0, str(PROJECT_ROOT))
+sys.path.insert(0, str(PROJECT_ROOT / "backend"))
+
+from agent.agent import InvestigationAgent
+
+
+router = APIRouter(tags=["investigation-agent"])
+
+
+class InvestigationRequest(BaseModel):
+    user_input: str
+
+
+@router.post("/agent/investigate")
+def investigate(request: InvestigationRequest) -> dict:
+    """Investigate an alert ID embedded in user input, e.g. '分析 AL000001'."""
+    try:
+        return InvestigationAgent().run(request.user_input)
+    except ValueError as error:
+        raise HTTPException(status_code=404, detail=str(error)) from error
