@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+from datetime import datetime, timezone
 from typing import Any, Callable
 
 from agent.prompt import INVESTIGATION_PROMPT
@@ -23,6 +24,7 @@ def _render_deterministic_report(data: dict[str, Any]) -> str:
     risk_explanation = explainability.get("risk_explanation", {})
     score_explanation = explainability.get("score_explanation", {})
     response = data.get("risk_response", {})
+    generated_time = datetime.now(timezone.utc).isoformat(timespec="seconds")
     reasons = [f"- {item['reason']}：{item['evidence']}" for item in risk_explanation.get("reasons", [])] or ["- 当前没有返回额外结构化原因。"]
     score_lines = [f"- {item['factor']}：+{item['score']} 分（{item['reason']}）" for item in score_explanation.get("score_breakdown", [])] or ["- 当前没有返回评分拆解。"]
     path_lines = [f"- {' → '.join(path.get('account_path', []))}" for path in paths[:20]] or ["- Neo4j 未返回资金路径。"]
@@ -36,7 +38,7 @@ def _render_deterministic_report(data: dict[str, Any]) -> str:
 
 - 案件编号：{alert['alert_id']}
 - 风险账户：{alert['account_id']}
-- 生成时间：{alert.get('created_time', '未返回')}
+- 生成时间：{generated_time}
 
 ## 2. 风险结论
 
