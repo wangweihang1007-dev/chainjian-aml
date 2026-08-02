@@ -11,3 +11,7 @@ __pycache__/
 data/cleaned/
 data/realtime/
 data/generators/AMLSim/
+
+# React build artifacts
+web/node_modules/
+web/dist/

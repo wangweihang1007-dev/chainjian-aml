@@ -1,5 +1,23 @@
 # 链鉴 AML
 
+## React 审查工作台（推荐）
+
+`web/` 是新的前后端分离前端，采用 React + Vite + Phosphor Icons，实现第三套「证据审查工作台」视觉方案。它与现有 FastAPI 接口兼容，Streamlit 页面保留用于回归演示。
+
+```powershell
+# 终端 1：启动 FastAPI
+$env:NEO4J_PASSWORD="你的 Neo4j 密码"
+python -m uvicorn backend.main:app --host 0.0.0.0 --port 8000
+
+# 终端 2：启动 React
+cd web
+Copy-Item .env.example .env.local
+npm install
+npm run dev -- --host 0.0.0.0 --port 4173
+```
+
+浏览器访问 `http://127.0.0.1:4173`。前端默认通过 `VITE_API_URL=http://127.0.0.1:8000` 调用后端；后端不可用时会自动进入演示数据模式，并明确显示连接状态。
+
 面向合规审核人员的、可解释的反洗钱智能审查演示系统。
 
 ## 技术栈
