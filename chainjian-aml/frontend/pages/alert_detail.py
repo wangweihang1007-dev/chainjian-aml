@@ -17,6 +17,7 @@ from agent.tools import get_transaction_path, get_risk_response
 from explainability.evidence_builder import EvidenceBuilder
 from explainability.risk_explainer import RiskExplainer
 from explainability.score_explainer import ScoreExplainer
+from counterfactual.analyzer import CounterfactualAnalyzer
 from data_access import alert_detail, graph_intelligence, list_alerts
 from risk_profile.profile_service import AccountProfileService
 
@@ -129,6 +130,18 @@ try:
         st.caption(score_explanation.get("method", ""))
 except Exception as error:
     st.warning(f"Explainability unavailable: {error}")
+
+st.subheader("Counterfactual risk simulation")
+try:
+    counterfactual = CounterfactualAnalyzer().analyze(selected_id)
+    st.metric("Current risk", counterfactual["current_score"])
+    cf_rows = [{"Removed factor": item["removed_factor"], "After removal": item["score_after_removal"], "Impact": item["impact"], "Explanation": item["explanation"], "Simulated": item["simulated"]} for item in counterfactual.get("counterfactuals", [])]
+    if cf_rows:
+        st.dataframe(pd.DataFrame(cf_rows), use_container_width=True, hide_index=True)
+    else:
+        st.info("No evidence factor is available for simulation.")
+except Exception as error:
+    st.warning(f"Counterfactual analysis unavailable: {error}")
 
 st.divider()
 st.subheader("Evidence-based graph intelligence")

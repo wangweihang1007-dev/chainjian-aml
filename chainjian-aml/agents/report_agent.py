@@ -18,4 +18,4 @@ class ReportAgent:
 
     def run(self, data: dict[str, Any]) -> dict[str, Any]:
         report = generate_report(data, self.llm)
-        return {"report": report, "evidence_sources": [key for key in ("rule_analysis", "graph_analysis", "transaction_analysis", "transaction_evidence") if key in data]}
+        return {"report": report, "evidence_sources": [key for key in ("rule_analysis", "graph_analysis", "transaction_analysis", "transaction_evidence", "explainability", "counterfactual") if key in data]}

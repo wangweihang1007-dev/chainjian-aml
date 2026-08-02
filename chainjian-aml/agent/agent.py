@@ -15,6 +15,7 @@ from graph_intelligence.service import GraphIntelligenceService
 from explainability.evidence_builder import EvidenceBuilder
 from explainability.risk_explainer import RiskExplainer
 from explainability.score_explainer import ScoreExplainer
+from counterfactual.analyzer import CounterfactualAnalyzer
 from risk_profile.profile_service import AccountProfileService
 from rules.rapid_movement_rule import RapidMovementRule
 
@@ -53,10 +54,12 @@ class InvestigationAgent:
         report = results.get("generate_report", "")
         if "explainability" not in results:
             results["explainability"] = self._build_explainability(alert["alert_id"])
+        if "counterfactual" not in results:
+            results["counterfactual"] = CounterfactualAnalyzer(self.warehouse_path).analyze(alert["alert_id"])
         if not report:
             report = generate_report(self._report_data(results), self.llm)
         trace = self.trace_store.list(alert_id)
-        return {"alert_id": alert_id, "plan": plan_state, "trace": trace, "tool_data": self._report_data(results), "explainability": results.get("explainability", {}), "report": report}
+        return {"alert_id": alert_id, "plan": plan_state, "trace": trace, "tool_data": self._report_data(results), "explainability": results.get("explainability", {}), "counterfactual": results.get("counterfactual", {}), "report": report}
 
     def _execute(self, step: InvestigationStep, results: dict[str, Any]) -> Any:
         alert = results["alert"]
@@ -82,6 +85,7 @@ class InvestigationAgent:
             return get_risk_response(alert["alert_id"], self.warehouse_path)
         if step.tool_name == "generate_report":
             results["explainability"] = self._build_explainability(alert["alert_id"])
+            results["counterfactual"] = CounterfactualAnalyzer(self.warehouse_path).analyze(alert["alert_id"])
             return generate_report(self._report_data(results), self.llm)
         raise ValueError(f"Unsupported investigation tool: {step.tool_name}")
 
@@ -96,6 +100,7 @@ class InvestigationAgent:
             "risk_response": results.get("get_risk_response", {}),
             "risk_conclusion": results.get("build_risk_conclusion", {}),
             "explainability": results.get("explainability", {}),
+            "counterfactual": results.get("counterfactual", {}),
         }
 
     def _build_explainability(self, alert_id: str) -> dict[str, Any]:

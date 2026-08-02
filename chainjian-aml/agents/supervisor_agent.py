@@ -16,6 +16,7 @@ from core.warehouse import DEFAULT_DATABASE
 from explainability.evidence_builder import EvidenceBuilder
 from explainability.risk_explainer import RiskExplainer
 from explainability.score_explainer import ScoreExplainer
+from counterfactual.analyzer import CounterfactualAnalyzer
 from risk_profile.profile_service import AccountProfileService
 
 
@@ -60,6 +61,7 @@ class SupervisorAgent:
                     outputs["risk_response"] = get_risk_response(alert_id, self.warehouse_path)
                     chain = EvidenceBuilder(self.warehouse_path).build(alert_id)
                     outputs["explainability"] = {"evidence_chain": chain, "risk_explanation": RiskExplainer().explain(chain), "score_explanation": ScoreExplainer().explain(chain)}
+                    outputs["counterfactual"] = CounterfactualAnalyzer(self.warehouse_path).analyze(alert_id)
                     report_input = dict(outputs)
                     report_input["transaction_paths"] = outputs.get("graph_analysis", {}).get("paths", [])
                     report_input["risk_conclusion"] = {
@@ -79,7 +81,7 @@ class SupervisorAgent:
                 output = {"error": str(error)}
                 outputs[task["task_id"] + "_error"] = str(error)
                 self.tasks.finish(task_id, "FAILED", output)
-        return {"alert_id": alert_id, "supervisor": self.name, "tasks": self.tasks.list(alert_id), "results": outputs, "explainability": outputs.get("explainability", {}), "report": outputs.get("report", {}).get("report", "")}
+        return {"alert_id": alert_id, "supervisor": self.name, "tasks": self.tasks.list(alert_id), "results": outputs, "explainability": outputs.get("explainability", {}), "counterfactual": outputs.get("counterfactual", {}), "report": outputs.get("report", {}).get("report", "")}
 
     def get_tasks(self, alert_id: str) -> list[dict[str, Any]]:
         return self.tasks.list(alert_id)

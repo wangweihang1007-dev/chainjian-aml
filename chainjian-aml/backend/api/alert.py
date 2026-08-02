@@ -17,6 +17,7 @@ from core.warehouse import DEFAULT_DATABASE
 from explainability.evidence_builder import EvidenceBuilder
 from explainability.risk_explainer import RiskExplainer
 from explainability.score_explainer import ScoreExplainer
+from counterfactual.analyzer import CounterfactualAnalyzer
 from rules.rule_engine import RuleEngine
 
 
@@ -63,6 +64,15 @@ def explain_alert(alert_id: str) -> dict:
     try:
         chain = EvidenceBuilder(DEFAULT_DATABASE).build(alert_id)
         return {"alert_id": alert_id, "evidence_chain": chain, "risk_explanation": RiskExplainer().explain(chain), "score_explanation": ScoreExplainer().explain(chain)}
+    except ValueError as error:
+        raise HTTPException(status_code=404, detail=str(error)) from error
+
+
+@router.get("/alerts/{alert_id}/counterfactual")
+def counterfactual_alert(alert_id: str) -> dict:
+    """Return read-only risk simulations for evidence factors."""
+    try:
+        return CounterfactualAnalyzer(DEFAULT_DATABASE).analyze(alert_id)
     except ValueError as error:
         raise HTTPException(status_code=404, detail=str(error)) from error
 
