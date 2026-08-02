@@ -17,6 +17,8 @@ def generate_report(data: dict[str, Any], llm: Callable[[str, dict[str, Any]], s
 def _render_deterministic_report(data: dict[str, Any]) -> str:
     alert = data["alert"]
     graph = data.get("graph_intelligence", {})
+    profile = data.get("account_profile", {})
+    conclusion = data.get("risk_conclusion", {})
     evidence = data.get("transaction_evidence", [])
     paths = data.get("transaction_paths", [])
     rule_hits = ", ".join(alert.get("rule_hits", [])) or "None"
@@ -29,6 +31,7 @@ def _render_deterministic_report(data: dict[str, Any]) -> str:
     response = data.get("risk_response", {})
     recommendations = [f"- {item}" for item in response.get("recommendations", [])] or ["- No advisory recommendation available."]
     reasons = [f"- {item}" for item in response.get("reason", [])] or ["- No additional reason returned."]
+    profile_lines = [f"- {key}: {value}" for key, value in profile.items() if key in {"txn_count", "total_amount", "inflow_amount", "outflow_amount", "counterparty_count", "average_holding_time_minutes", "anomalous_transaction_count", "risk_features"}] or ["- No account profile returned."]
     return f"""# AML Investigation Report
 
 ## Case information
@@ -55,6 +58,10 @@ def _render_deterministic_report(data: dict[str, Any]) -> str:
 
 {chr(10).join(role_lines)}
 
+## Account risk profile
+
+{chr(10).join(profile_lines)}
+
 ## Evidence timeline
 
 {chr(10).join(timeline_lines)}
@@ -62,6 +69,13 @@ def _render_deterministic_report(data: dict[str, Any]) -> str:
 ## Key transaction counterfactuals
 
 {chr(10).join(counterfactual_lines)}
+
+## Risk conclusion
+
+- Level: {conclusion.get('risk_level', alert.get('risk_level'))}
+- Score: {conclusion.get('risk_score', alert.get('risk_score'))}
+- Evidence transaction IDs: {', '.join(conclusion.get('evidence_transaction_ids', [])) or 'None returned'}
+- Conclusion: {conclusion.get('conclusion', 'Based only on the returned Alert and transaction evidence.')}
 
 ## Associated accounts for manual review
 

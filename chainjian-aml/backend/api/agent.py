@@ -29,3 +29,8 @@ def investigate(request: InvestigationRequest) -> dict:
         return InvestigationAgent().run(request.user_input)
     except ValueError as error:
         raise HTTPException(status_code=404, detail=str(error)) from error
+
+
+@router.get("/agent/investigate/{alert_id}/trace")
+def investigation_trace(alert_id: str) -> dict:
+    return {"alert_id": alert_id, "trace": InvestigationAgent().get_trace(alert_id)}
