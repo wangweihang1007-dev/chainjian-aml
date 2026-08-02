@@ -14,6 +14,9 @@ sys.path.insert(0, str(PROJECT_ROOT))
 from app.alert_service import AlertService
 from app.review_service import ReviewService
 from core.warehouse import DEFAULT_DATABASE
+from explainability.evidence_builder import EvidenceBuilder
+from explainability.risk_explainer import RiskExplainer
+from explainability.score_explainer import ScoreExplainer
 from rules.rule_engine import RuleEngine
 
 
@@ -52,6 +55,16 @@ def get_alert(alert_id: str) -> dict:
     if not alert:
         raise HTTPException(status_code=404, detail="Alert not found")
     return alert.as_dict()
+
+
+@router.get("/alerts/{alert_id}/explainability")
+def explain_alert(alert_id: str) -> dict:
+    """Return the evidence chain and deterministic score explanation."""
+    try:
+        chain = EvidenceBuilder(DEFAULT_DATABASE).build(alert_id)
+        return {"alert_id": alert_id, "evidence_chain": chain, "risk_explanation": RiskExplainer().explain(chain), "score_explanation": ScoreExplainer().explain(chain)}
+    except ValueError as error:
+        raise HTTPException(status_code=404, detail=str(error)) from error
 
 
 @router.post("/alerts/{alert_id}/review")

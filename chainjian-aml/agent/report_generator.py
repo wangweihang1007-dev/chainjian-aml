@@ -29,6 +29,11 @@ def _render_deterministic_report(data: dict[str, Any]) -> str:
     counterfactual_lines = [f"- {item['transaction_id']}: {item['impact_level']} impact; {item['explanation']}" for item in graph.get("counterfactual", [])[:5]] or ["- No counterfactual result available."]
     associated_lines = [f"- {item['account_id']}: {item['hops']} hop(s), strength {item['path_strength']}, transactions {', '.join(item['path_transaction_ids'])}" for item in graph.get("associated_review", [])[:10]] or ["- No associated review leads available."]
     response = data.get("risk_response", {})
+    explainability = data.get("explainability", {})
+    risk_explanation = explainability.get("risk_explanation", {})
+    score_explanation = explainability.get("score_explanation", {})
+    explain_reasons = [f"- {item['reason']}: {item['evidence']}" for item in risk_explanation.get("reasons", [])] or ["- No structured explanation returned."]
+    score_lines = [f"- {item['factor']}: {item['score']} points ({item['reason']})" for item in score_explanation.get("score_breakdown", [])] or ["- No score breakdown returned."]
     recommendations = [f"- {item}" for item in response.get("recommendations", [])] or ["- No advisory recommendation available."]
     reasons = [f"- {item}" for item in response.get("reason", [])] or ["- No additional reason returned."]
     profile_lines = [f"- {key}: {value}" for key, value in profile.items() if key in {"txn_count", "total_amount", "inflow_amount", "outflow_amount", "counterparty_count", "average_holding_time_minutes", "anomalous_transaction_count", "risk_features"}] or ["- No account profile returned."]
@@ -76,6 +81,20 @@ def _render_deterministic_report(data: dict[str, Any]) -> str:
 - Score: {conclusion.get('risk_score', alert.get('risk_score'))}
 - Evidence transaction IDs: {', '.join(conclusion.get('evidence_transaction_ids', [])) or 'None returned'}
 - Conclusion: {conclusion.get('conclusion', 'Based only on the returned Alert and transaction evidence.')}
+
+## Explainability
+
+- Why this risk: {risk_explanation.get('conclusion', 'No additional explanation returned.')}
+- Explanation confidence: {risk_explanation.get('confidence', 'N/A')}
+
+### Evidence chain
+
+{chr(10).join(explain_reasons)}
+
+### Score breakdown
+
+- Total score: {score_explanation.get('total_score', alert.get('risk_score'))}
+{chr(10).join(score_lines)}
 
 ## Associated accounts for manual review
 

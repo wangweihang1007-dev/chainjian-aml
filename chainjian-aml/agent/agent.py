@@ -12,6 +12,9 @@ from agent.report_generator import generate_report
 from agent.tools import get_alert_detail, get_risk_response, get_transaction_evidence, get_transaction_path
 from core.warehouse import DEFAULT_DATABASE
 from graph_intelligence.service import GraphIntelligenceService
+from explainability.evidence_builder import EvidenceBuilder
+from explainability.risk_explainer import RiskExplainer
+from explainability.score_explainer import ScoreExplainer
 from risk_profile.profile_service import AccountProfileService
 from rules.rapid_movement_rule import RapidMovementRule
 
@@ -48,10 +51,12 @@ class InvestigationAgent:
                 results[f"{step.tool_name}_error"] = str(error)
 
         report = results.get("generate_report", "")
+        if "explainability" not in results:
+            results["explainability"] = self._build_explainability(alert["alert_id"])
         if not report:
             report = generate_report(self._report_data(results), self.llm)
         trace = self.trace_store.list(alert_id)
-        return {"alert_id": alert_id, "plan": plan_state, "trace": trace, "tool_data": self._report_data(results), "report": report}
+        return {"alert_id": alert_id, "plan": plan_state, "trace": trace, "tool_data": self._report_data(results), "explainability": results.get("explainability", {}), "report": report}
 
     def _execute(self, step: InvestigationStep, results: dict[str, Any]) -> Any:
         alert = results["alert"]
@@ -76,6 +81,7 @@ class InvestigationAgent:
         if step.tool_name == "get_risk_response":
             return get_risk_response(alert["alert_id"], self.warehouse_path)
         if step.tool_name == "generate_report":
+            results["explainability"] = self._build_explainability(alert["alert_id"])
             return generate_report(self._report_data(results), self.llm)
         raise ValueError(f"Unsupported investigation tool: {step.tool_name}")
 
@@ -89,7 +95,12 @@ class InvestigationAgent:
             "graph_intelligence": results.get("check_cycle_evidence", {}),
             "risk_response": results.get("get_risk_response", {}),
             "risk_conclusion": results.get("build_risk_conclusion", {}),
+            "explainability": results.get("explainability", {}),
         }
+
+    def _build_explainability(self, alert_id: str) -> dict[str, Any]:
+        chain = EvidenceBuilder(self.warehouse_path).build(alert_id)
+        return {"evidence_chain": chain, "risk_explanation": RiskExplainer().explain(chain), "score_explanation": ScoreExplainer().explain(chain)}
 
     def get_trace(self, alert_id: str) -> list[dict[str, Any]]:
         return self.trace_store.list(alert_id)

@@ -14,6 +14,9 @@ sys.path.insert(0, str(PROJECT_ROOT / "backend"))
 
 from agent.agent import InvestigationAgent
 from agent.tools import get_transaction_path, get_risk_response
+from explainability.evidence_builder import EvidenceBuilder
+from explainability.risk_explainer import RiskExplainer
+from explainability.score_explainer import ScoreExplainer
 from data_access import alert_detail, graph_intelligence, list_alerts
 from risk_profile.profile_service import AccountProfileService
 
@@ -95,6 +98,37 @@ with right:
             st.write(f"- {recommendation}")
     except Exception as error:
         st.caption(f"Risk response unavailable: {error}")
+
+st.divider()
+st.subheader("Explainable risk analysis")
+try:
+    evidence_chain = EvidenceBuilder().build(selected_id)
+    explanation = RiskExplainer().explain(evidence_chain)
+    score_explanation = ScoreExplainer().explain(evidence_chain)
+    explain_left, explain_right = st.columns([1.4, 1])
+    with explain_left:
+        st.markdown(f"**Why this risk:** {explanation['conclusion']}")
+        st.caption(f"Evidence confidence: {explanation['confidence']}")
+        for item in evidence_chain.get("evidence", []):
+            with st.expander(f"{item['type']} · {item.get('description', '')}", expanded=True):
+                if item.get("path"):
+                    st.write(f"Path: {item['path']}")
+                if item.get("holding_time") is not None:
+                    st.write(f"Holding time: {item['holding_time']} minutes")
+                transaction_rows = item.get("transactions", [])
+                if transaction_rows:
+                    st.dataframe(pd.DataFrame(transaction_rows), use_container_width=True, hide_index=True)
+                if item.get("paths"):
+                    st.write("Neo4j paths:")
+                    for path in item["paths"][:5]:
+                        st.write(" → ".join(path.get("account_path", [])))
+    with explain_right:
+        st.metric("Explained total score", score_explanation["total_score"])
+        score_rows = [{"Factor": item["factor"], "Score": item["score"], "Raw": item.get("raw_score"), "Reason": item["reason"]} for item in score_explanation.get("score_breakdown", [])]
+        st.dataframe(pd.DataFrame(score_rows), use_container_width=True, hide_index=True)
+        st.caption(score_explanation.get("method", ""))
+except Exception as error:
+    st.warning(f"Explainability unavailable: {error}")
 
 st.divider()
 st.subheader("Evidence-based graph intelligence")
