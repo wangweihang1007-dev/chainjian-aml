@@ -1,4 +1,4 @@
-"""Interactive Agent page with auditable investigation progress."""
+"""Streamlit view for single-agent and multi-agent AML investigations."""
 
 from pathlib import Path
 import sys
@@ -12,24 +12,41 @@ sys.path.insert(0, str(PROJECT_ROOT))
 sys.path.insert(0, str(PROJECT_ROOT / "backend"))
 
 from agent.agent import InvestigationAgent
+from agents.supervisor_agent import SupervisorAgent
 
-st.set_page_config(page_title="AML Investigation Agent", page_icon="🕵️", layout="wide")
-st.title("AML Investigation Agent")
-st.caption("Agent 会根据预警规则和账户画像动态选择调查工具，所有步骤都会记录到 investigation_trace。")
+st.set_page_config(page_title="AML Agent 协作调查", page_icon="🔎", layout="wide")
+st.title("AML Agent 协作调查")
+st.caption("Supervisor Agent 根据规则命中和账户画像动态分配专业 Agent；所有结果来自当前 Alert、DWD、Neo4j 和账户画像查询。")
 
+mode = st.radio("调查模式", ["Multi-Agent 协作", "兼容：单 Agent"], horizontal=True)
 question = st.chat_input("例如：分析 AL000001")
 if question:
     with st.chat_message("user"):
         st.write(question)
     with st.chat_message("assistant"):
         try:
-            result = InvestigationAgent().run(question)
-            trace = result.get("trace", [])
-            st.subheader("调查进度")
-            rows = [{"步骤": item["step_id"], "名称": item["step_name"], "状态": item["status"], "工具": item["tool_name"], "开始": item["started_time"], "结束": item["finished_time"], "结果摘要": item["output_summary"]} for item in trace]
-            st.dataframe(pd.DataFrame(rows), use_container_width=True, hide_index=True)
-            st.subheader("调查报告")
-            st.markdown(result["report"])
-            st.download_button("下载 Markdown 报告", result["report"], file_name=f"{result['alert_id']}_investigation.md", mime="text/markdown")
+            if mode == "Multi-Agent 协作":
+                result = SupervisorAgent().run(question)
+                tasks = result.get("tasks", [])
+                rows = [{"Agent": item["agent_name"], "任务": item["task_type"], "状态": item["status"], "创建时间": item["created_time"], "开始": item["started_time"], "结束": item["finished_time"], "输出摘要": item["output_summary"]} for item in tasks]
+                st.subheader("AI 调查流程")
+                st.dataframe(pd.DataFrame(rows), use_container_width=True, hide_index=True)
+                st.subheader("协作结果")
+                result_data = result.get("results", {})
+                cols = st.columns(max(1, len(tasks)))
+                for col, task in zip(cols, tasks):
+                    with col:
+                        st.metric(task["agent_name"], task["status"])
+                        st.caption(task.get("output_summary") or "等待输出")
+                st.subheader("调查报告")
+                st.markdown(result.get("report", "暂无报告"))
+                st.download_button("下载 Markdown 报告", result.get("report", ""), file_name=f"{result['alert_id']}_multi_agent.md", mime="text/markdown")
+            else:
+                result = InvestigationAgent().run(question)
+                trace = result.get("trace", [])
+                st.subheader("单 Agent 调查进度")
+                st.dataframe(pd.DataFrame(trace), use_container_width=True, hide_index=True)
+                st.subheader("调查报告")
+                st.markdown(result.get("report", "暂无报告"))
         except Exception as error:
             st.error(str(error))

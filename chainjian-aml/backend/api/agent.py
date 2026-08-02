@@ -13,6 +13,7 @@ sys.path.insert(0, str(PROJECT_ROOT))
 sys.path.insert(0, str(PROJECT_ROOT / "backend"))
 
 from agent.agent import InvestigationAgent
+from agents.supervisor_agent import SupervisorAgent
 
 
 router = APIRouter(tags=["investigation-agent"])
@@ -34,3 +35,17 @@ def investigate(request: InvestigationRequest) -> dict:
 @router.get("/agent/investigate/{alert_id}/trace")
 def investigation_trace(alert_id: str) -> dict:
     return {"alert_id": alert_id, "trace": InvestigationAgent().get_trace(alert_id)}
+
+
+@router.post("/agent/multi-investigate")
+def multi_investigate(request: InvestigationRequest) -> dict:
+    """Run the dynamic multi-agent investigation workflow."""
+    try:
+        return SupervisorAgent().run(request.user_input)
+    except ValueError as error:
+        raise HTTPException(status_code=404, detail=str(error)) from error
+
+
+@router.get("/agent/multi-investigate/{alert_id}/tasks")
+def multi_investigation_tasks(alert_id: str) -> dict:
+    return {"alert_id": alert_id, "tasks": SupervisorAgent().get_tasks(alert_id)}
