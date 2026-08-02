@@ -12,14 +12,8 @@ sys.path.insert(0, str(FRONTEND_DIR))
 sys.path.insert(0, str(PROJECT_ROOT))
 sys.path.insert(0, str(PROJECT_ROOT / "backend"))
 
-from agent.agent import InvestigationAgent
-from agent.tools import get_transaction_path, get_risk_response
-from explainability.evidence_builder import EvidenceBuilder
-from explainability.risk_explainer import RiskExplainer
-from explainability.score_explainer import ScoreExplainer
-from counterfactual.analyzer import CounterfactualAnalyzer
-from data_access import alert_detail, graph_intelligence, list_alerts
-from risk_profile.profile_service import AccountProfileService
+from api_client import request_json
+from data_access import account_profile, alert_detail, graph_intelligence, list_alerts, risk_response, transaction_paths
 
 
 def graph_dot(paths: list[dict]) -> str:
@@ -48,7 +42,7 @@ st.session_state["selected_alert_id"] = selected_id
 alert = alert_detail(selected_id)
 assert alert is not None
 try:
-    profile = AccountProfileService().get(alert["account_id"])
+    profile = account_profile(alert["account_id"])
 except Exception as error:
     profile = {"error": str(error), "risk_features": []}
 
@@ -72,7 +66,7 @@ with left:
 with centre:
     st.subheader("Neo4j transaction paths")
     try:
-        paths = get_transaction_path(alert["account_id"])
+        paths = transaction_paths(alert["account_id"])
         if paths:
             st.graphviz_chart(graph_dot(paths), use_container_width=True)
             rows = [{"Path": " -> ".join(path["account_path"]), "Transaction": transfer["transaction_id"], "Amount": f"{transfer['amount_paid']} {transfer['payment_currency']}", "Time": transfer["timestamp"]} for path in paths for transfer in path["transfers"]]
@@ -86,14 +80,14 @@ with right:
     prompt = st.text_area("Question", value=f"Analyze {selected_id}", height=90)
     if st.button("Generate investigation report", type="primary"):
         try:
-            result = InvestigationAgent().run(prompt)
+            result = request_json("/agent/investigate", "POST", {"user_input": prompt})
             st.success("Investigation completed")
             st.markdown(result["report"])
             st.download_button("Download Markdown report", result["report"], file_name=f"{selected_id}_investigation.md", mime="text/markdown")
         except Exception as error:
             st.error(f"Investigation failed: {error}")
     try:
-        response = get_risk_response(selected_id)
+        response = risk_response(selected_id)
         st.markdown("**Advisory response (no automatic account action)**")
         for recommendation in response["recommendations"]:
             st.write(f"- {recommendation}")
@@ -103,9 +97,10 @@ with right:
 st.divider()
 st.subheader("Explainable risk analysis")
 try:
-    evidence_chain = EvidenceBuilder().build(selected_id)
-    explanation = RiskExplainer().explain(evidence_chain)
-    score_explanation = ScoreExplainer().explain(evidence_chain)
+    explainability = request_json(f"/alerts/{selected_id}/explainability")
+    evidence_chain = explainability["evidence_chain"]
+    explanation = explainability["risk_explanation"]
+    score_explanation = explainability["score_explanation"]
     explain_left, explain_right = st.columns([1.4, 1])
     with explain_left:
         st.markdown(f"**Why this risk:** {explanation['conclusion']}")
@@ -133,7 +128,7 @@ except Exception as error:
 
 st.subheader("Counterfactual risk simulation")
 try:
-    counterfactual = CounterfactualAnalyzer().analyze(selected_id)
+    counterfactual = request_json(f"/alerts/{selected_id}/counterfactual")
     st.metric("Current risk", counterfactual["current_score"])
     cf_rows = [{"Removed factor": item["removed_factor"], "After removal": item["score_after_removal"], "Impact": item["impact"], "Explanation": item["explanation"], "Simulated": item["simulated"]} for item in counterfactual.get("counterfactuals", [])]
     if cf_rows:

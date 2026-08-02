@@ -60,3 +60,18 @@ python rules/rule_engine.py --warehouse data/warehouse/aml.db
 uvicorn main:app --app-dir backend --reload
 streamlit run frontend/app.py
 ```
+# 前后端分离启动
+
+FastAPI 后端和 Streamlit 前端现在通过 HTTP API 通信，前端不再直接连接 SQLite、Neo4j 或业务 Service。
+
+```powershell
+# 终端 1：后端
+$env:NEO4J_PASSWORD="你的Neo4j密码"
+python -m uvicorn backend.main:app --host 0.0.0.0 --port 8000
+
+# 终端 2：前端
+$env:AML_BACKEND_URL="http://127.0.0.1:8000"
+python -m streamlit run frontend/app.py --server.port 8501
+```
+
+也可以在项目 `.env` 中配置 `AML_BACKEND_URL`。前端页面通过 `/alerts`、`/agent`、`/dashboard`、`/graph`、`/reviews` 等 FastAPI 接口获取数据。

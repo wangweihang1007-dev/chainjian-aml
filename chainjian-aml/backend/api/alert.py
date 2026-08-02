@@ -18,6 +18,8 @@ from explainability.evidence_builder import EvidenceBuilder
 from explainability.risk_explainer import RiskExplainer
 from explainability.score_explainer import ScoreExplainer
 from counterfactual.analyzer import CounterfactualAnalyzer
+from agent.tools import get_risk_response, get_transaction_evidence
+from risk_profile.profile_service import AccountProfileService
 from rules.rule_engine import RuleEngine
 
 
@@ -50,6 +52,11 @@ def list_alerts() -> list[dict]:
     return [alert.as_dict() for alert in service().list_alerts()]
 
 
+@router.get("/reviews/pending")
+def pending_reviews() -> list[dict]:
+    return [alert.as_dict() for alert in review_service().pending_alerts()]
+
+
 @router.get("/alerts/{alert_id}")
 def get_alert(alert_id: str) -> dict:
     alert = service().get_alert(alert_id)
@@ -75,6 +82,26 @@ def counterfactual_alert(alert_id: str) -> dict:
         return CounterfactualAnalyzer(DEFAULT_DATABASE).analyze(alert_id)
     except ValueError as error:
         raise HTTPException(status_code=404, detail=str(error)) from error
+
+
+@router.get("/alerts/{alert_id}/risk-response")
+def alert_risk_response(alert_id: str) -> dict:
+    try:
+        return get_risk_response(alert_id, DEFAULT_DATABASE)
+    except ValueError as error:
+        raise HTTPException(status_code=404, detail=str(error)) from error
+
+
+@router.get("/alerts/{alert_id}/transaction-evidence")
+def alert_transaction_evidence(alert_id: str) -> dict:
+    if not service().get_alert(alert_id):
+        raise HTTPException(status_code=404, detail="Alert not found")
+    return {"alert_id": alert_id, "transactions": get_transaction_evidence(alert_id, DEFAULT_DATABASE)}
+
+
+@router.get("/accounts/{account_id}/profile")
+def account_profile(account_id: str) -> dict:
+    return AccountProfileService(DEFAULT_DATABASE).get(account_id)
 
 
 @router.post("/alerts/{alert_id}/review")
