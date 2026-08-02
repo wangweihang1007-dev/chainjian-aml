@@ -33,6 +33,12 @@ def run_read(cypher: str, parameters: dict[str, Any] | None = None) -> list[dict
         return [record.data() for record in session.run(cypher, parameters or {})]
 
 
+def run_write(cypher: str, parameters: dict[str, Any] | None = None) -> None:
+    """Execute one parameterized write against the configured graph."""
+    with get_neo4j_driver().session(database=NEO4J_DATABASE) as session:
+        session.execute_write(lambda tx: tx.run(cypher, parameters or {}).consume())
+
+
 def close_neo4j_driver() -> None:
     """Close and clear the shared Neo4j driver."""
     driver = get_neo4j_driver()

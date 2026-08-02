@@ -32,7 +32,11 @@ def to_datetime(value: Any) -> datetime:
         value = value.to_native()
     if isinstance(value, datetime):
         return value.replace(tzinfo=None)
-    return datetime.fromisoformat(str(value).replace("Z", "+00:00")).replace(tzinfo=None)
+    text = str(value).replace("Z", "+00:00")
+    try:
+        return datetime.fromisoformat(text).replace(tzinfo=None)
+    except ValueError:
+        return datetime.strptime(text, "%Y/%m/%d %H:%M:%S").replace(tzinfo=None)
 
 
 class CycleRule:

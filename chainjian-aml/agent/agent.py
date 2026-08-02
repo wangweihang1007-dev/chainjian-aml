@@ -7,8 +7,9 @@ from pathlib import Path
 from typing import Any, Callable
 
 from agent.report_generator import generate_report
-from agent.tools import get_alert_detail, get_transaction_evidence, get_transaction_path
+from agent.tools import get_alert_detail, get_transaction_evidence, get_transaction_path, get_risk_response
 from core.warehouse import DEFAULT_DATABASE
+from graph_intelligence.service import GraphIntelligenceService
 
 
 class InvestigationAgent:
@@ -24,7 +25,12 @@ class InvestigationAgent:
             raise ValueError(f"Alert not found: {alert_id}")
         paths = get_transaction_path(alert["account_id"])
         evidence = get_transaction_evidence(alert_id, self.warehouse_path)
-        data = {"alert": alert, "transaction_paths": paths, "transaction_evidence": evidence}
+        try:
+            graph_intelligence = GraphIntelligenceService(self.warehouse_path).investigate(alert_id)
+        except Exception as error:
+            graph_intelligence = {"error": str(error), "roles": [], "timeline": [], "counterfactual": [], "associated_review": []}
+        response = get_risk_response(alert_id, self.warehouse_path)
+        data = {"alert": alert, "transaction_paths": paths, "transaction_evidence": evidence, "graph_intelligence": graph_intelligence, "risk_response": response}
         return {"alert_id": alert_id, "tool_data": data, "report": generate_report(data, self.llm)}
 
     def run(self, user_input: str) -> dict[str, Any]:

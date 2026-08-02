@@ -15,6 +15,7 @@ from app.alert_service import AlertService
 from core.neo4j_client import run_read
 from core.warehouse import DEFAULT_DATABASE
 from agent.report_generator import generate_report
+from risk_profile.profile_service import AccountProfileService
 
 
 def get_alert_detail(alert_id: str, warehouse_path: Path = DEFAULT_DATABASE) -> dict[str, Any] | None:
@@ -83,6 +84,36 @@ def get_transaction_evidence(alert_id: str, warehouse_path: Path = DEFAULT_DATAB
     ]
     positions = {transaction_id: index for index, transaction_id in enumerate(ordered_ids)}
     return sorted(results, key=lambda item: positions[item["transaction_id"]])
+
+
+def get_risk_response(alert_id: str, warehouse_path: Path = DEFAULT_DATABASE) -> dict[str, Any]:
+    """Return advisory actions only; this tool never executes account controls."""
+    alert = get_alert_detail(alert_id, warehouse_path)
+    if not alert:
+        raise ValueError(f"Alert not found: {alert_id}")
+    profile = AccountProfileService(warehouse_path).get(alert["account_id"])
+    rules = set(alert.get("rule_hits", []))
+    reasons: list[str] = []
+    recommendations: list[str] = ["加强账户监控", "人工核查资金来源和交易对手"]
+    if "RAPID_MOVEMENT" in rules or "资金快进快出" in profile["risk_features"]:
+        reasons.append("存在快进快出行为")
+        recommendations.append("重点复核入账后短时间内的转出交易")
+    if profile["counterparty_count"] >= 10:
+        reasons.append("关联账户数量异常")
+        recommendations.append("核查关联账户之间的业务关系和实际控制人")
+    if profile["txn_count"] >= 20:
+        reasons.append("交易频率较高")
+    if alert["risk_level"] == "HIGH":
+        recommendations.append("在人工审核完成前提高预警优先级")
+    return {
+        "alert_id": alert_id,
+        "risk_level": alert["risk_level"],
+        "recommendations": list(dict.fromkeys(recommendations)),
+        "reason": list(dict.fromkeys(reasons)) or ["当前画像和命中规则未提供额外处置原因"],
+        "profile": profile,
+        "advisory_only": True,
+        "disclaimer": "仅提供合规人员辅助建议，不自动执行冻结、限额或其他账户操作。",
+    }
 
 
 def _serialize_temporal(value: Any) -> Any:

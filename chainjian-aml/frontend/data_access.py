@@ -15,6 +15,7 @@ sys.path.insert(0, str(PROJECT_ROOT / "backend"))
 
 from app.alert_service import AlertService
 from core.warehouse import DEFAULT_DATABASE
+from graph_intelligence.service import GraphIntelligenceService
 
 
 def dashboard_data() -> dict[str, Any]:
@@ -57,3 +58,7 @@ def list_alerts(risk_level: str | None = None, status: str | None = None) -> lis
 def alert_detail(alert_id: str) -> dict[str, Any] | None:
     alert = AlertService(DEFAULT_DATABASE).get_alert(alert_id)
     return alert.as_dict() if alert else None
+
+
+def graph_intelligence(alert_id: str, max_hops: int = 3) -> dict[str, Any]:
+    return GraphIntelligenceService(DEFAULT_DATABASE).investigate(alert_id, max_hops)

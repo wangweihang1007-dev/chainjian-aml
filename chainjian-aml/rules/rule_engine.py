@@ -13,9 +13,11 @@ sys.path.insert(0, str(PROJECT_ROOT / "backend"))
 
 from core.warehouse import DEFAULT_DATABASE
 from rules.cycle_rule import CycleRule
+from rules.behavior_rule import DailyActivityRule, NearThresholdStructuringRule
 from rules.fanin_rule import FanInRule
 from rules.models import Alert
 from rules.multihop_rule import MultiHopRule
+from rules.rapid_movement_rule import RapidMovementRule
 from rules.structuring_rule import StructuringRule
 
 
@@ -27,8 +29,11 @@ class RuleEngine:
         self.rules = [
             CycleRule(warehouse_path),
             StructuringRule(warehouse_path),
+            DailyActivityRule(warehouse_path),
+            NearThresholdStructuringRule(warehouse_path),
             FanInRule(warehouse_path),
             MultiHopRule(warehouse_path),
+            RapidMovementRule(warehouse_path),
         ]
 
     def run(self) -> list[Alert]:
