@@ -12,7 +12,11 @@ from counterfactual.counterfactual_report import render_counterfactual_section
 def generate_report(data: dict[str, Any], llm: Callable[[str, dict[str, Any]], str] | None = None) -> str:
     """Generate a report from exact tool data; the default path never invents facts."""
     if llm:
-        return llm(INVESTIGATION_PROMPT, data)
+        try:
+            return llm(INVESTIGATION_PROMPT, data)
+        except Exception:
+            # A provider outage or unsupported model must not hide the grounded report.
+            pass
     return _render_deterministic_report(data)
 
 

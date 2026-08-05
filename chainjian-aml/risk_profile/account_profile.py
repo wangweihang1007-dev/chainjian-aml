@@ -20,6 +20,7 @@ class AccountRiskProfile:
     maximum_transaction_amount: float
     average_holding_time_minutes: float | None
     anomalous_transaction_count: int
+    active_days: int | None
     risk_features: list[str] = field(default_factory=list)
 
     def as_dict(self) -> dict[str, Any]:

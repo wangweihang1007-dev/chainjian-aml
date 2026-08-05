@@ -10,10 +10,24 @@ from api.graph_intelligence import router as graph_intelligence_router
 from api.monitoring import router as monitoring_router
 from api.report import router as report_router
 from api.dashboard import router as dashboard_router
+from api.materials import router as materials_router
+from api.material_metrics import router as material_metrics_router
+from api.auth import router as auth_router
 from fastapi.middleware.cors import CORSMiddleware
 
 app = FastAPI(title="ChainJian AML")
-app.add_middleware(CORSMiddleware, allow_origins=["http://localhost:8501", "http://127.0.0.1:8501"], allow_credentials=True, allow_methods=["*"], allow_headers=["*"])
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=[
+        "http://localhost:8501",
+        "http://127.0.0.1:8501",
+        "http://localhost:4173",
+        "http://127.0.0.1:4173",
+    ],
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
 app.include_router(alert_router)
 app.include_router(agent_router)
 app.include_router(evaluation_router)
@@ -22,6 +36,9 @@ app.include_router(graph_intelligence_router)
 app.include_router(monitoring_router)
 app.include_router(report_router)
 app.include_router(dashboard_router)
+app.include_router(materials_router)
+app.include_router(material_metrics_router)
+app.include_router(auth_router)
 
 
 @app.get("/health", tags=["system"])

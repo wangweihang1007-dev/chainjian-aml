@@ -71,6 +71,7 @@ class AccountProfileService:
                 holding_times.append((_parse_time(outgoing[1]) - incoming_time).total_seconds() / 60)
 
         txn_count = len(rows)
+        active_days = len({str(row[1])[:10] for row in rows}) if rows else 0
         inflow_amount = round(sum(float(row[5]) for row in inflows), 2)
         outflow_amount = round(sum(float(row[4]) for row in outflows), 2)
         total_amount = round(inflow_amount + outflow_amount, 2)
@@ -101,6 +102,7 @@ class AccountProfileService:
             maximum_transaction_amount=maximum_amount,
             average_holding_time_minutes=round(sum(holding_times) / len(holding_times), 2) if holding_times else None,
             anomalous_transaction_count=anomalous,
+            active_days=active_days,
             risk_features=features,
         )
 

@@ -17,7 +17,7 @@ class GraphAgent:
         self.warehouse_path = warehouse_path
 
     def run(self, account_id: str) -> dict[str, Any]:
-        paths = get_transaction_path(account_id, max_hops=3)
+        paths = get_transaction_path(account_id, max_hops=3, warehouse_path=self.warehouse_path)
         suspicious_nodes = sorted({node for path in paths for node in path.get("account_path", [])[1:]})
         cycles = []
         query = """
@@ -28,7 +28,11 @@ class GraphAgent:
                 payment_currency: transfer.payment_currency}] AS transfers
         LIMIT 20
         """
-        for row in run_read(query, {"account_id": account_id}):
+        try:
+            cycle_rows = run_read(query, {"account_id": account_id})
+        except Exception:
+            cycle_rows = []
+        for row in cycle_rows:
             cycles.append(self._serialize(row))
         return {"account_id": account_id, "paths": paths, "suspicious_nodes": suspicious_nodes, "cycles": cycles}
 

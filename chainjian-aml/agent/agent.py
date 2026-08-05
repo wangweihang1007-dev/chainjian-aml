@@ -9,6 +9,7 @@ from typing import Any, Callable
 from agent.investigation_planner import InvestigationStep, build_plan
 from agent.investigation_trace import InvestigationTraceStore
 from agent.report_generator import generate_report
+from agent.llm_client import configured_llm, llm_status
 from agent.tools import get_alert_detail, get_risk_response, get_transaction_evidence, get_transaction_path
 from core.warehouse import DEFAULT_DATABASE
 from graph_intelligence.service import GraphIntelligenceService
@@ -25,7 +26,7 @@ class InvestigationAgent:
 
     def __init__(self, warehouse_path: Path = DEFAULT_DATABASE, llm: Callable[[str, dict[str, Any]], str] | None = None) -> None:
         self.warehouse_path = warehouse_path
-        self.llm = llm
+        self.llm = llm or configured_llm()[1]
         self.trace_store = InvestigationTraceStore(warehouse_path)
 
     def investigate(self, alert_id: str) -> dict[str, Any]:
@@ -59,7 +60,7 @@ class InvestigationAgent:
         if not report:
             report = generate_report(self._report_data(results), self.llm)
         trace = self.trace_store.list(alert_id)
-        return {"alert_id": alert_id, "plan": plan_state, "trace": trace, "tool_data": self._report_data(results), "explainability": results.get("explainability", {}), "counterfactual": results.get("counterfactual", {}), "report": report}
+        return {"alert_id": alert_id, "plan": plan_state, "trace": trace, "tool_data": self._report_data(results), "explainability": results.get("explainability", {}), "counterfactual": results.get("counterfactual", {}), "ai": llm_status(), "report": report}
 
     def _execute(self, step: InvestigationStep, results: dict[str, Any]) -> Any:
         alert = results["alert"]
@@ -69,7 +70,7 @@ class InvestigationAgent:
         if step.tool_name == "get_account_profile":
             return results["profile"]
         if step.tool_name == "get_transaction_path":
-            return get_transaction_path(account_id, max_hops=3)
+            return get_transaction_path(account_id, max_hops=3, warehouse_path=self.warehouse_path)
         if step.tool_name == "check_cycle_evidence":
             graph = GraphIntelligenceService(self.warehouse_path).investigate(alert["alert_id"])
             return {"counterfactual": graph.get("counterfactual", []), "edges": [edge for edge in graph.get("evidence_subgraph", {}).get("edges", []) if edge.get("evidence_type") == "direct_hit"]}

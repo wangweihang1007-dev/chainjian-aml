@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import hashlib
+import sqlite3
 from collections import defaultdict
 from datetime import datetime, timedelta
 from pathlib import Path
@@ -26,7 +27,11 @@ class RapidMovementRule:
     def detect(self) -> list[Alert]:
         incoming: dict[str, list[dict]] = defaultdict(list)
         outgoing: dict[str, list[dict]] = defaultdict(list)
-        for raw in run_read(TRANSFER_QUERY):
+        try:
+            transfer_rows = run_read(TRANSFER_QUERY)
+        except Exception:
+            transfer_rows = self._sqlite_transfer_rows()
+        for raw in transfer_rows:
             raw["event_time"] = to_datetime(raw["timestamp"])
             if raw["source_account_id"] != raw["target_account_id"]:
                 if float(raw["amount_paid"] or 0) >= self.min_incoming_amount:
@@ -60,3 +65,24 @@ class RapidMovementRule:
             if len(alerts) >= self.max_alerts:
                 break
         return alerts
+
+    def _sqlite_transfer_rows(self) -> list[dict]:
+        """Use the canonical DWD transaction table when Neo4j is unavailable."""
+        with sqlite3.connect(self.warehouse_path) as connection:
+            rows = connection.execute(
+                """SELECT from_account_id, to_account_id, transaction_id,
+                          transaction_time, amount_paid, payment_currency
+                   FROM dwd_transaction_detail
+                   ORDER BY transaction_time, transaction_id"""
+            ).fetchall()
+        return [
+            {
+                "source_account_id": row[0],
+                "target_account_id": row[1],
+                "transaction_id": row[2],
+                "timestamp": row[3],
+                "amount_paid": row[4],
+                "payment_currency": row[5],
+            }
+            for row in rows
+        ]

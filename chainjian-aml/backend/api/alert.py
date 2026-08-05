@@ -5,7 +5,7 @@ from __future__ import annotations
 import sys
 from pathlib import Path
 
-from fastapi import APIRouter, HTTPException
+from fastapi import APIRouter, Header, HTTPException
 from pydantic import BaseModel
 
 PROJECT_ROOT = Path(__file__).resolve().parents[2]
@@ -21,6 +21,7 @@ from counterfactual.analyzer import CounterfactualAnalyzer
 from agent.tools import get_risk_response, get_transaction_evidence
 from risk_profile.profile_service import AccountProfileService
 from rules.rule_engine import RuleEngine
+from api.auth import current_user
 
 
 router = APIRouter(tags=["alerts"])
@@ -105,12 +106,19 @@ def account_profile(account_id: str) -> dict:
 
 
 @router.post("/alerts/{alert_id}/review")
-def submit_review(alert_id: str, request: ReviewRequest) -> dict:
+def submit_review(alert_id: str, request: ReviewRequest, authorization: str | None = Header(default=None)) -> dict:
     try:
-        review = review_service().submit_review(alert_id, request.reviewer, request.action, request.comment)
+        if request.action.upper() not in {"CONFIRM", "REJECT", "NEED_MORE_INFO"} or not request.reviewer.strip() or not request.comment.strip():
+            review_service().submit_review(alert_id, request.reviewer, request.action, request.comment)
+        user = current_user(authorization)
+        if not user:
+            raise HTTPException(status_code=401, detail="请先登录审核账号")
+        if user["username"] != request.reviewer.strip():
+            raise HTTPException(status_code=403, detail="审核人必须与当前登录账号一致")
+        review = review_service().submit_review(alert_id, user["username"], request.action, request.comment)
         return review.as_dict()
     except ValueError as error:
-        raise HTTPException(status_code=400 if "action" in str(error) or "reviewer" in str(error) else 404, detail=str(error)) from error
+        raise HTTPException(status_code=400 if any(field in str(error) for field in ("action", "reviewer", "comment")) else 404, detail=str(error)) from error
 
 
 @router.get("/alerts/{alert_id}/reviews")
