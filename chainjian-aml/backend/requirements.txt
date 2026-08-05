@@ -5,3 +5,6 @@ networkx
 streamlit
 neo4j
 python-dotenv
+python-multipart
+pillow
+opencv-python-headless

@@ -11,6 +11,7 @@ from agents.graph_agent import GraphAgent
 from agents.report_agent import ReportAgent
 from agents.rule_agent import RuleAgent
 from agents.task_store import InvestigationTaskStore
+from agent.llm_client import configured_llm, llm_status
 from agents.transaction_agent import TransactionAgent
 from core.warehouse import DEFAULT_DATABASE
 from explainability.evidence_builder import EvidenceBuilder
@@ -31,7 +32,7 @@ class SupervisorAgent:
         self.rule_agent = RuleAgent(warehouse_path)
         self.graph_agent = GraphAgent(warehouse_path)
         self.transaction_agent = TransactionAgent(warehouse_path)
-        self.report_agent = ReportAgent(warehouse_path, llm)
+        self.report_agent = ReportAgent(warehouse_path, llm or configured_llm()[1])
 
     def _task_plan(self, alert: dict[str, Any], profile: dict[str, Any]) -> list[dict[str, Any]]:
         hits = set(alert.get("rule_hits", []))
@@ -81,7 +82,7 @@ class SupervisorAgent:
                 output = {"error": str(error)}
                 outputs[task["task_id"] + "_error"] = str(error)
                 self.tasks.finish(task_id, "FAILED", output)
-        return {"alert_id": alert_id, "supervisor": self.name, "tasks": self.tasks.list(alert_id), "results": outputs, "explainability": outputs.get("explainability", {}), "counterfactual": outputs.get("counterfactual", {}), "report": outputs.get("report", {}).get("report", "")}
+        return {"alert_id": alert_id, "supervisor": self.name, "tasks": self.tasks.list(alert_id), "results": outputs, "explainability": outputs.get("explainability", {}), "counterfactual": outputs.get("counterfactual", {}), "ai": llm_status(), "report": outputs.get("report", {}).get("report", "")}
 
     def get_tasks(self, alert_id: str) -> list[dict[str, Any]]:
         return self.tasks.list(alert_id)

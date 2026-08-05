@@ -49,6 +49,8 @@ class ReviewService:
             raise ValueError("action must be CONFIRM, REJECT, or NEED_MORE_INFO")
         if not reviewer:
             raise ValueError("reviewer is required")
+        if not comment:
+            raise ValueError("comment is required")
         timestamp = datetime.now(timezone.utc).isoformat(timespec="seconds")
         with self._connect() as connection:
             self._ensure_schema(connection)

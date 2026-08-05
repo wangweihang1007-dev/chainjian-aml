@@ -83,7 +83,8 @@ class InvestigationTaskStore:
             connection.executescript(SCHEMA)
             rows = connection.execute("""SELECT task_id, agent_name, task_type, input_json, output_summary,
                 status, created_time, started_time, finished_time FROM investigation_task
-                WHERE alert_id=? ORDER BY task_id""", (alert_id,)).fetchall()
+                WHERE alert_id=? AND created_time=(SELECT MAX(created_time) FROM investigation_task WHERE alert_id=?)
+                ORDER BY task_id""", (alert_id, alert_id)).fetchall()
         finally:
             connection.close()
         return [{"task_id": row[0], "agent_name": row[1], "task_type": row[2], "input": json.loads(row[3]), "output_summary": row[4], "status": row[5], "created_time": row[6], "started_time": row[7], "finished_time": row[8]} for row in rows]

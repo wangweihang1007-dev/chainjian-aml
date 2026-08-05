@@ -3,9 +3,12 @@
 from __future__ import annotations
 
 from collections import defaultdict, deque
+import sqlite3
+from pathlib import Path
 from typing import Any
 
 from core.neo4j_client import run_read
+from core.warehouse import DEFAULT_DATABASE
 from rules.cycle_rule import TRANSFER_QUERY
 
 from graph_intelligence.models import GraphEdge
@@ -19,7 +22,26 @@ def build_evidence_subgraph(alert: dict[str, Any], max_hops: int = 3, max_edges:
         content = item.get("evidence_content", {})
         direct_accounts.update(str(account) for account in content.get("account_path", []))
 
-    rows = run_read(TRANSFER_QUERY)
+    try:
+        rows = run_read(TRANSFER_QUERY)
+        data_source = "Neo4j"
+    except Exception:
+        with sqlite3.connect(DEFAULT_DATABASE) as connection:
+            rows = [
+                {
+                    "source_account_id": row[0], "target_account_id": row[1],
+                    "transaction_id": row[2], "timestamp": row[3],
+                    "amount_paid": row[4], "payment_currency": row[5],
+                }
+                for row in connection.execute(
+                    """SELECT from_account_id, to_account_id, transaction_id,
+                              transaction_time, amount_paid, payment_currency
+                       FROM dwd_transaction_detail
+                       WHERE from_account_id <> to_account_id
+                       ORDER BY transaction_time, transaction_id"""
+                ).fetchall()
+            ]
+        data_source = "SQLite Warehouse（Neo4j 不可用）"
     normalized = []
     adjacency: dict[str, list[dict[str, Any]]] = defaultdict(list)
     for row in rows:
@@ -62,4 +84,5 @@ def build_evidence_subgraph(alert: dict[str, Any], max_hops: int = 3, max_edges:
         "edges": [edge.as_dict() for edge in selected],
         "direct_transaction_ids": sorted(direct_transactions),
         "max_hops": max_hops,
+        "data_source": data_source,
     }

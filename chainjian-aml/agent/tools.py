@@ -1,4 +1,4 @@
-"""Read-only tools used by the AML Investigation Agent."""
+"""Read-only tools used by the AML investigation agent."""
 
 from __future__ import annotations
 
@@ -14,18 +14,16 @@ sys.path.insert(0, str(PROJECT_ROOT / "backend"))
 from app.alert_service import AlertService
 from core.neo4j_client import run_read
 from core.warehouse import DEFAULT_DATABASE
-from agent.report_generator import generate_report
 from risk_profile.profile_service import AccountProfileService
 
 
 def get_alert_detail(alert_id: str, warehouse_path: Path = DEFAULT_DATABASE) -> dict[str, Any] | None:
-    """Return a normalized APP-layer alert case, or None if it does not exist."""
     alert = AlertService(warehouse_path).get_alert(alert_id)
     return alert.as_dict() if alert else None
 
 
-def get_transaction_path(account_id: str, max_hops: int = 3, limit: int = 30) -> list[dict[str, Any]]:
-    """Return outbound 1–3 hop fund paths from Neo4j, with transfer facts."""
+def get_transaction_path(account_id: str, max_hops: int = 3, limit: int = 30, warehouse_path: Path = DEFAULT_DATABASE) -> list[dict[str, Any]]:
+    """Return graph paths, with a deterministic SQLite one-hop fallback."""
     if not 1 <= max_hops <= 3:
         raise ValueError("max_hops must be between 1 and 3")
     query = f"""
@@ -40,21 +38,46 @@ def get_transaction_path(account_id: str, max_hops: int = 3, limit: int = 30) ->
            }}] AS transfers
     LIMIT $limit
     """
-    unique_paths: list[dict[str, Any]] = []
+    try:
+        return _unique_paths(run_read(query, {"account_id": account_id, "limit": limit * 3}), limit)
+    except Exception:
+        return _sqlite_transaction_paths(account_id, limit, warehouse_path)
+
+
+def _unique_paths(rows: Any, limit: int) -> list[dict[str, Any]]:
+    result: list[dict[str, Any]] = []
     seen: set[tuple[str, ...]] = set()
-    for row in run_read(query, {"account_id": account_id, "limit": limit * 3}):
-        serialized = _serialize_temporal(row)
-        key = tuple(serialized["account_path"])
-        if key not in seen:
+    for row in rows:
+        item = _serialize_temporal(row)
+        key = tuple(item.get("account_path", []))
+        if key and key not in seen:
             seen.add(key)
-            unique_paths.append(serialized)
-        if len(unique_paths) == limit:
+            result.append(item)
+        if len(result) >= limit:
             break
-    return unique_paths
+    return result
+
+
+def _sqlite_transaction_paths(account_id: str, limit: int, warehouse_path: Path = DEFAULT_DATABASE) -> list[dict[str, Any]]:
+    """Use DWD facts when Neo4j is unavailable; never invent graph edges."""
+    with sqlite3.connect(warehouse_path) as connection:
+        rows = connection.execute(
+            """SELECT transaction_id, transaction_time, amount_paid, payment_currency,
+                      from_account_id, to_account_id
+               FROM dwd_transaction_detail
+               WHERE from_account_id = ?
+               ORDER BY transaction_time
+               LIMIT ?""",
+            (account_id, limit),
+        ).fetchall()
+    return [{
+        "account_path": [row[4], row[5]],
+        "transfers": [{"transaction_id": row[0], "timestamp": row[1], "amount_paid": float(row[2]), "payment_currency": row[3]}],
+        "source": "DWD SQLite fallback",
+    } for row in rows]
 
 
 def get_transaction_evidence(alert_id: str, warehouse_path: Path = DEFAULT_DATABASE) -> list[dict[str, Any]]:
-    """Return only DWD transaction facts referenced by an alert's saved evidence."""
     alert = get_alert_detail(alert_id, warehouse_path)
     if not alert:
         return []
@@ -74,20 +97,16 @@ def get_transaction_evidence(alert_id: str, warehouse_path: Path = DEFAULT_DATAB
                 FROM dwd_transaction_detail WHERE transaction_id IN ({placeholders})""",
             ordered_ids,
         ).fetchall()
-    results = [
-        {
-            "transaction_id": row[0], "timestamp": row[1], "from_account_id": row[2], "to_account_id": row[3],
-            "amount_paid": float(row[4]), "payment_currency": row[5], "amount_received": float(row[6]),
-            "receiving_currency": row[7], "payment_format": row[8],
-        }
-        for row in rows
-    ]
+    results = [{
+        "transaction_id": row[0], "timestamp": row[1], "from_account_id": row[2], "to_account_id": row[3],
+        "amount_paid": float(row[4]), "payment_currency": row[5], "amount_received": float(row[6]),
+        "receiving_currency": row[7], "payment_format": row[8],
+    } for row in rows]
     positions = {transaction_id: index for index, transaction_id in enumerate(ordered_ids)}
     return sorted(results, key=lambda item: positions[item["transaction_id"]])
 
 
 def get_risk_response(alert_id: str, warehouse_path: Path = DEFAULT_DATABASE) -> dict[str, Any]:
-    """Return advisory actions only; this tool never executes account controls."""
     alert = get_alert_detail(alert_id, warehouse_path)
     if not alert:
         raise ValueError(f"Alert not found: {alert_id}")
