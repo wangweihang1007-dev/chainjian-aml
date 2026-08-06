@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 import json
-import sqlite3
+from core.database import sqlite3
 import sys
 from collections import Counter
 from datetime import datetime, timezone
@@ -16,6 +16,7 @@ sys.path.insert(0, str(PROJECT_ROOT / "backend"))
 
 from core.neo4j_client import run_read
 from core.warehouse import DEFAULT_DATABASE
+from evaluation.evaluate_rules import evaluate_rules
 
 MONITORING_SCHEMA = """
 CREATE TABLE IF NOT EXISTS monitoring_snapshot (
@@ -50,7 +51,7 @@ def level(value: float, yellow: float, red: float) -> str:
     return "RED" if value >= red else ("YELLOW" if value >= yellow else "GREEN")
 
 
-def collect_metrics(database_path: Path = DEFAULT_DATABASE, include_graph: bool = True) -> dict[str, Any]:
+def collect_metrics(database_path: Path = DEFAULT_DATABASE, include_graph: bool = True, quality_mode: str = "balanced") -> dict[str, Any]:
     now = datetime.now(timezone.utc).isoformat(timespec="seconds")
     with sqlite3.connect(database_path) as connection:
         connection.executescript(MONITORING_SCHEMA)
@@ -87,6 +88,7 @@ def collect_metrics(database_path: Path = DEFAULT_DATABASE, include_graph: bool 
             },
             "realtime_sync": dict(zip(("created_at", "status", "new_rows", "sqlite_inserted", "neo4j_synced", "error"), sync)) if sync else None,
         }
+        metrics["evaluation"] = evaluate_rules(database_path, quality_mode=quality_mode)
         scores = [float(row[0]) for row in score_rows]
         metrics["distribution"]["risk_score_psi_level"] = level(metrics["distribution"]["risk_score_psi"], 0.10, 0.25)
         if include_graph:

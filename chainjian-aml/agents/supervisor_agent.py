@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import re
+from concurrent.futures import ThreadPoolExecutor, as_completed
 from pathlib import Path
 from typing import Any
 
@@ -19,6 +20,8 @@ from explainability.risk_explainer import RiskExplainer
 from explainability.score_explainer import ScoreExplainer
 from counterfactual.analyzer import CounterfactualAnalyzer
 from risk_profile.profile_service import AccountProfileService
+from agents.evidence import build_evidence_index
+from agents.evidence_judge import EvidenceJudge
 
 
 class SupervisorAgent:
@@ -33,6 +36,7 @@ class SupervisorAgent:
         self.graph_agent = GraphAgent(warehouse_path)
         self.transaction_agent = TransactionAgent(warehouse_path)
         self.report_agent = ReportAgent(warehouse_path, llm or configured_llm()[1])
+        self.evidence_judge = EvidenceJudge()
 
     def _task_plan(self, alert: dict[str, Any], profile: dict[str, Any]) -> list[dict[str, Any]]:
         hits = set(alert.get("rule_hits", []))
@@ -53,11 +57,57 @@ class SupervisorAgent:
         ids = self.tasks.initialize(alert_id, task_plan)
         outputs: dict[str, Any] = {"alert": alert, "account_profile": profile}
         runners = {"rule": lambda: self.rule_agent.run(alert_id), "graph": lambda: self.graph_agent.run(alert["account_id"]), "transaction": lambda: self.transaction_agent.run(alert["account_id"])}
-        for task in task_plan:
+        specialist_tasks = [task for task in task_plan if task["task_id"] != "report"]
+        outputs["orchestration"] = {"mode": "parallel_dag", "parallel_tasks": [task["task_id"] for task in specialist_tasks], "max_supplement_rounds": 1}
+
+        def execute(task: dict[str, Any]) -> tuple[str, Any]:
             task_id = ids[task["task_id"]]
             self.tasks.start(task_id)
             try:
-                if task["task_id"] == "report":
+                output = runners[task["task_id"]]()
+                self.tasks.finish(task_id, "COMPLETED", output)
+                return task["task_id"], output
+            except Exception as error:
+                failure = {"error": str(error), "degraded": True}
+                self.tasks.finish(task_id, "FAILED", failure)
+                return task["task_id"], failure
+
+        with ThreadPoolExecutor(max_workers=max(1, len(specialist_tasks))) as pool:
+            futures = [pool.submit(execute, task) for task in specialist_tasks]
+            for future in as_completed(futures):
+                task_key, output = future.result()
+                if "error" in output:
+                    outputs[task_key + "_error"] = output["error"]
+                else:
+                    outputs[task_key + "_analysis"] = output
+
+        evidence = build_evidence_index(outputs)
+        outputs["evidence"] = evidence
+        outputs["evidence_judgement"] = self.evidence_judge.evaluate(alert, outputs, evidence)
+        # One bounded supplement round prevents runaway agent loops while still
+        # allowing a failed specialist to be retried when evidence is insufficient.
+        if outputs["evidence_judgement"]["needs_more_evidence"]:
+            supplement = next((task for task in specialist_tasks if task["task_id"] + "_error" in outputs), None)
+            if supplement:
+                task_id = ids[supplement["task_id"]]
+                outputs["orchestration"]["supplement_round"] = supplement["task_id"]
+                self.tasks.start(task_id)
+                try:
+                    retry = runners[supplement["task_id"]]()
+                    outputs[supplement["task_id"] + "_analysis"] = retry
+                    outputs.pop(supplement["task_id"] + "_error", None)
+                    self.tasks.finish(task_id, "COMPLETED", retry)
+                    outputs["evidence"] = build_evidence_index(outputs)
+                    outputs["evidence_judgement"] = self.evidence_judge.evaluate(alert, outputs, outputs["evidence"])
+                except Exception as error:
+                    outputs["evidence_judgement"]["issues"].append(f"补查失败：{error}")
+
+        report_task = next(task for task in task_plan if task["task_id"] == "report")
+        report_id = ids["report"]
+        self.tasks.start(report_id)
+        try:
+            task = report_task
+            if task["task_id"] == "report":
                     outputs["transaction_evidence"] = get_transaction_evidence(alert_id, self.warehouse_path)
                     outputs["risk_response"] = get_risk_response(alert_id, self.warehouse_path)
                     chain = EvidenceBuilder(self.warehouse_path).build(alert_id)
@@ -72,16 +122,15 @@ class SupervisorAgent:
                         "evidence_transaction_ids": [item["transaction_id"] for item in outputs["transaction_evidence"]],
                         "conclusion": "结论仅基于预警、规则 Agent、图谱 Agent、交易 Agent 返回的事实证据。",
                     }
+                    report_input["evidence"] = outputs["evidence"]
+                    report_input["evidence_judgement"] = outputs["evidence_judgement"]
                     output = self.report_agent.run(report_input)
                     outputs["report"] = output
-                else:
-                    output = runners[task["task_id"]]()
-                    outputs[task["task_id"] + "_analysis"] = output
-                self.tasks.finish(task_id, "COMPLETED", output)
-            except Exception as error:
-                output = {"error": str(error)}
-                outputs[task["task_id"] + "_error"] = str(error)
-                self.tasks.finish(task_id, "FAILED", output)
+            self.tasks.finish(report_id, "COMPLETED", output)
+        except Exception as error:
+            output = {"error": str(error), "degraded": True}
+            outputs["report_error"] = str(error)
+            self.tasks.finish(report_id, "FAILED", output)
         return {"alert_id": alert_id, "supervisor": self.name, "tasks": self.tasks.list(alert_id), "results": outputs, "explainability": outputs.get("explainability", {}), "counterfactual": outputs.get("counterfactual", {}), "ai": llm_status(), "report": outputs.get("report", {}).get("report", "")}
 
     def get_tasks(self, alert_id: str) -> list[dict[str, Any]]:

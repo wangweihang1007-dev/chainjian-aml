@@ -28,13 +28,16 @@ class GraphAgent:
                 payment_currency: transfer.payment_currency}] AS transfers
         LIMIT 20
         """
+        degraded = False
         try:
             cycle_rows = run_read(query, {"account_id": account_id})
         except Exception:
             cycle_rows = []
+            degraded = True
         for row in cycle_rows:
             cycles.append(self._serialize(row))
-        return {"account_id": account_id, "paths": paths, "suspicious_nodes": suspicious_nodes, "cycles": cycles}
+        return {"account_id": account_id, "paths": paths, "suspicious_nodes": suspicious_nodes, "cycles": cycles,
+                "data_source": "SQLite fallback" if degraded else "Neo4j / SQLite path service", "degraded": degraded}
 
     @staticmethod
     def _serialize(row: dict[str, Any]) -> dict[str, Any]:

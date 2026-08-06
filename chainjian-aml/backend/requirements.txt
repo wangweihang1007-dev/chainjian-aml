@@ -8,3 +8,4 @@ python-dotenv
 python-multipart
 pillow
 opencv-python-headless
+psycopg2-binary>=2.9,<3.0

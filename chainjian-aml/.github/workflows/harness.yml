@@ -1,0 +1,27 @@
+name: ChainJian harness
+
+on:
+  push:
+    branches: [main, master, "codex/**"]
+  pull_request:
+
+defaults:
+  run:
+    working-directory: chainjian-aml
+
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+      - name: Install Python dependencies
+        run: python -m pip install --upgrade pip && pip install -r backend/requirements.txt pytest
+      - name: Install frontend dependencies
+        working-directory: chainjian-aml/web
+        run: npm install --no-audit --no-fund
+      - name: Run Python and frontend harness
+        run: python -m harness.run all --skip-eval

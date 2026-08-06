@@ -8,7 +8,7 @@ from __future__ import annotations
 
 import argparse
 import csv
-import sqlite3
+from core.database import sqlite3
 from datetime import datetime, timezone
 from pathlib import Path
 
@@ -16,7 +16,7 @@ from pathlib import Path
 PROJECT_ROOT = Path(__file__).resolve().parents[2]
 DEFAULT_RAW_DIR = PROJECT_ROOT / "data"
 DEFAULT_CLEAN_DIR = DEFAULT_RAW_DIR / "cleaned"
-DEFAULT_DATABASE = PROJECT_ROOT / "data" / "warehouse" / "aml.db"
+DEFAULT_DATABASE = PROJECT_ROOT / "data" / "warehouse" / "aml.db"  # legacy path token; connect() uses DATABASE_URL
 
 
 SCHEMA = """
@@ -236,11 +236,8 @@ def account_id(bank_id: str, account_number: str) -> str:
     return f"{bank_id}::{account_number}"
 
 
-def connect(path: Path) -> sqlite3.Connection:
-    path.parent.mkdir(parents=True, exist_ok=True)
-    connection = sqlite3.connect(path)
-    connection.execute("PRAGMA foreign_keys = ON")
-    return connection
+def connect(path: Path | str = DEFAULT_DATABASE) -> sqlite3.Connection:
+    return sqlite3.connect(path)
 
 
 def require_files(directory: Path, names: tuple[str, ...]) -> None:
@@ -252,8 +249,10 @@ def require_files(directory: Path, names: tuple[str, ...]) -> None:
 def build_warehouse(raw_dir: Path, clean_dir: Path, database_path: Path, replace: bool = False) -> dict[str, int]:
     require_files(raw_dir, ("accounts.csv", "transactions.csv", "labels.csv", "cases.csv"))
     require_files(clean_dir, ("accounts.csv", "transactions.csv", "cases.csv"))
-    if database_path.exists() and replace:
-        database_path.unlink()
+    if replace:
+        with connect(database_path) as connection:
+            connection.execute("DROP SCHEMA public CASCADE")
+            connection.execute("CREATE SCHEMA public")
 
     raw_accounts, raw_transactions = read_rows(raw_dir / "accounts.csv"), read_rows(raw_dir / "transactions.csv")
     raw_labels, raw_cases = read_rows(raw_dir / "labels.csv"), read_rows(raw_dir / "cases.csv")
@@ -327,7 +326,7 @@ def build_ads(connection: sqlite3.Connection, now: str) -> None:
 
 
 def main() -> None:
-    parser = argparse.ArgumentParser(description="Build the ChainJian AML layered SQLite warehouse.")
+    parser = argparse.ArgumentParser(description="Build the ChainJian AML layered PostgreSQL warehouse.")
     parser.add_argument("--raw-dir", type=Path, default=DEFAULT_RAW_DIR)
     parser.add_argument("--clean-dir", type=Path, default=DEFAULT_CLEAN_DIR)
     parser.add_argument("--database", type=Path, default=DEFAULT_DATABASE)

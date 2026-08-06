@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 import json
-import sqlite3
+from core.database import sqlite3
 from hashlib import sha256
 
 from app.alert_model import AlertEvidence
@@ -32,7 +32,7 @@ def save_evidence(connection: sqlite3.Connection, alert_id: str, evidence_items:
             """INSERT INTO alert_evidence (evidence_id, alert_id, evidence_type, evidence_content)
             VALUES (?, ?, ?, ?)
             ON CONFLICT(evidence_id) DO UPDATE SET evidence_content=excluded.evidence_content""",
-            (identifier, alert_id, item.evidence_type, json.dumps(content, ensure_ascii=False)),
+            (identifier, alert_id, item.evidence_type, json.dumps(content, ensure_ascii=False, default=str)),
         )
         saved.append(AlertEvidence(identifier, alert_id, item.evidence_type, content))
     return saved

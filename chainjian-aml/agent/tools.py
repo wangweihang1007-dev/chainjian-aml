@@ -2,7 +2,6 @@
 
 from __future__ import annotations
 
-import sqlite3
 import sys
 from pathlib import Path
 from typing import Any
@@ -11,6 +10,7 @@ PROJECT_ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(PROJECT_ROOT))
 sys.path.insert(0, str(PROJECT_ROOT / "backend"))
 
+from core.database import sqlite3
 from app.alert_service import AlertService
 from core.neo4j_client import run_read
 from core.warehouse import DEFAULT_DATABASE
@@ -23,11 +23,11 @@ def get_alert_detail(alert_id: str, warehouse_path: Path = DEFAULT_DATABASE) -> 
 
 
 def get_transaction_path(account_id: str, max_hops: int = 3, limit: int = 30, warehouse_path: Path = DEFAULT_DATABASE) -> list[dict[str, Any]]:
-    """Return graph paths, with a deterministic SQLite one-hop fallback."""
+    """Return graph paths, with a deterministic PostgreSQL one-hop fallback."""
     if not 1 <= max_hops <= 3:
         raise ValueError("max_hops must be between 1 and 3")
     query = f"""
-    MATCH path = (source:Account {{account_id: $account_id}})-[:TRANSFER*1..{max_hops}]->(target:Account)
+    MATCH path = (source:Account {{account_id: $account_id}})-[:TRANSFER*1..{max_hops}]-(target:Account)
     WHERE source <> target
     RETURN [node IN nodes(path) | node.account_id] AS account_path,
            [transfer IN relationships(path) | {{
@@ -39,7 +39,13 @@ def get_transaction_path(account_id: str, max_hops: int = 3, limit: int = 30, wa
     LIMIT $limit
     """
     try:
-        return _unique_paths(run_read(query, {"account_id": account_id, "limit": limit * 3}), limit)
+        rows = run_read(query, {"account_id": account_id, "limit": limit * 3})
+        # The relational fallback returns the full transfer projection. Apply
+        # the account predicate here because the fallback SQL is intentionally
+        # shared by all graph rules.
+        if rows and "account_path" not in rows[0]:
+            rows = [row for row in rows if account_id in {row.get("source_account_id"), row.get("target_account_id")}]
+        return _unique_paths(rows, limit)
     except Exception:
         return _sqlite_transaction_paths(account_id, limit, warehouse_path)
 
@@ -49,6 +55,20 @@ def _unique_paths(rows: Any, limit: int) -> list[dict[str, Any]]:
     seen: set[tuple[str, ...]] = set()
     for row in rows:
         item = _serialize_temporal(row)
+        # ``run_read`` returns the canonical transfer projection when Neo4j is
+        # unavailable. Convert that projection to the path shape expected by
+        # the graph API instead of silently dropping every fallback row.
+        if not item.get("account_path") and item.get("source_account_id") and item.get("target_account_id"):
+            item = {
+                "account_path": [item["source_account_id"], item["target_account_id"]],
+                "transfers": [{
+                    "transaction_id": item.get("transaction_id"),
+                    "timestamp": item.get("timestamp"),
+                    "amount_paid": item.get("amount_paid"),
+                    "payment_currency": item.get("payment_currency"),
+                }],
+                "source": "DWD PostgreSQL fallback",
+            }
         key = tuple(item.get("account_path", []))
         if key and key not in seen:
             seen.add(key)
@@ -65,15 +85,15 @@ def _sqlite_transaction_paths(account_id: str, limit: int, warehouse_path: Path 
             """SELECT transaction_id, transaction_time, amount_paid, payment_currency,
                       from_account_id, to_account_id
                FROM dwd_transaction_detail
-               WHERE from_account_id = ?
+               WHERE from_account_id = ? OR to_account_id = ?
                ORDER BY transaction_time
                LIMIT ?""",
-            (account_id, limit),
+            (account_id, account_id, limit),
         ).fetchall()
     return [{
         "account_path": [row[4], row[5]],
         "transfers": [{"transaction_id": row[0], "timestamp": row[1], "amount_paid": float(row[2]), "payment_currency": row[3]}],
-        "source": "DWD SQLite fallback",
+        "source": "DWD PostgreSQL fallback",
     } for row in rows]
 
 

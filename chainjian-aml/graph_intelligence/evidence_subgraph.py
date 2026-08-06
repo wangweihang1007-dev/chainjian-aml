@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 from collections import defaultdict, deque
-import sqlite3
+from core.database import sqlite3
 from pathlib import Path
 from typing import Any
 
@@ -41,7 +41,7 @@ def build_evidence_subgraph(alert: dict[str, Any], max_hops: int = 3, max_edges:
                        ORDER BY transaction_time, transaction_id"""
                 ).fetchall()
             ]
-        data_source = "SQLite Warehouse（Neo4j 不可用）"
+        data_source = "PostgreSQL Warehouse（Neo4j 不可用）"
     normalized = []
     adjacency: dict[str, list[dict[str, Any]]] = defaultdict(list)
     for row in rows:

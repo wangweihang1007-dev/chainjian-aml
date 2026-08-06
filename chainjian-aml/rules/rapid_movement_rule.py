@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 import hashlib
-import sqlite3
+from core.database import sqlite3
 from collections import defaultdict
 from datetime import datetime, timedelta
 from pathlib import Path

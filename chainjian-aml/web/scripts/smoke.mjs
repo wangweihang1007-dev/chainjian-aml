@@ -1,6 +1,6 @@
 const base = (process.env.SMOKE_API_URL || 'http://127.0.0.1:8000').replace(/\/$/, '')
 const frontend = (process.env.SMOKE_FRONTEND_URL || 'http://127.0.0.1:4173').replace(/\/$/, '')
-const strict = process.env.SMOKE_STRICT === 'true'
+const strict = process.env.SMOKE_STRICT !== 'false'
 
 async function request(url, options) {
   const response = await fetch(url, options)

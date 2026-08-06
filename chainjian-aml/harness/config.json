@@ -1,0 +1,13 @@
+{
+  "evaluation": {
+    "overall": {
+      "f1": 0.4
+    },
+    "rules": {
+      "cycle": {
+        "precision": 0.9,
+        "recall": 0.9
+      }
+    }
+  }
+}

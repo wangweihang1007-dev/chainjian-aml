@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-import sqlite3
+from core.database import sqlite3
 
 from app.review_model import AuditLog
 

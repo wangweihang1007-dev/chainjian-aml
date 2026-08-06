@@ -91,3 +91,50 @@ body, .app-shell, .section-page { background: #0d151f; }
 .agent-disclaimer { font-size: 0; }.agent-disclaimer::after { content: '辅助分析结果须结合原始证据与人工审查确认。'; font-size: 10px; }
 .agent-page > .primary-button { font-size: 0; }.agent-page > .primary-button::after { content: '执行证据分析'; font-size: 13px; }
 .agent-busy { font-size: 0; }.agent-busy::after { content: '正在建立证据索引并计算风险特征，请稍候…'; font-size: 11px; }
+/* Evaluation quality cards */
+.monitoring-quality { margin-top: 15px; }
+.monitoring-section-head { display: flex; justify-content: space-between; align-items: start; gap: 16px; }
+.monitoring-section-head h2 { margin-bottom: 5px; }
+.monitoring-section-head p, .snapshot-label { color: #8197ad; font-size: 11px; }
+.snapshot-label { font-family: 'DM Mono'; }
+.monitoring-quality-grid { margin-top: 15px; }
+.quality-card strong { color: #63d2a9; }
+.rule-quality-table { margin-top: 18px; border: 1px solid #2d4256; border-radius: 5px; overflow: hidden; }
+.rule-quality-row { display: grid; grid-template-columns: 1.3fr repeat(3, .8fr) 1.2fr; gap: 12px; align-items: center; padding: 11px 13px; border-top: 1px solid #293b4c; color: #b8cbe0; font: 11px 'DM Mono'; }
+.rule-quality-row:first-child { border-top: 0; }
+.rule-quality-header { color: #8298ae; background: #111e2b; font-family: inherit; }
+.monitoring-warning { margin-top: 14px; padding: 10px 12px; border: 1px solid #765b32; background: #332817; color: #f0c47b; font-size: 11px; }
+.quality-mode-panel { margin-top: 15px; }
+.quality-mode-switch { display: flex; gap: 6px; }
+.quality-mode-switch button { border: 1px solid #344b63; background: #142231; color: #91a8bf; border-radius: 4px; padding: 8px 12px; font-size: 11px; }
+.quality-mode-switch button.selected { color: #fff; border-color: #4c9bf0; background: #1a4775; }
+.mode-metric-grid { margin-top: 15px; }
+.industry-benchmark { margin-top: 15px; }
+.benchmark-badge { color: #e5bb6d; border: 1px solid #806735; border-radius: 4px; padding: 5px 8px; font: 10px 'DM Mono'; }
+.benchmark-table { margin-top: 15px; border: 1px solid #3b4651; overflow: hidden; }
+.benchmark-row { display: grid; grid-template-columns: 1.2fr 1fr 1.4fr; gap: 14px; align-items: center; padding: 10px 12px; border-top: 1px solid #343e48; color: #c7d0d8; font-size: 11px; }
+.benchmark-row:first-child { border-top: 0; }
+.benchmark-header { color: #8e9aa6; background: #1a2027; font-weight: 700; }
+.benchmark-row b { color: #e9eef3; }
+.benchmark-row small { color: #a3adb7; }
+.benchmark-note { margin: 14px 0 0; color: #e2b66a; font-size: 11px; line-height: 1.7; }
+.iteration-panel { margin-top: 15px; }
+.iteration-flow { display: flex; align-items: center; gap: 8px; margin: 18px 0; color: #6f8798; font: 10px 'DM Mono'; }
+.iteration-step { padding: 7px 9px; border: 1px solid #3b5666; border-radius: 3px; background: #132532; }
+.iteration-step.active { color: #a7d1d0; border-color: #4f8b85; }
+.iteration-step.gated { color: #f0c47b; border-color: #80684c; background: #2a241b; }
+.iteration-message { margin-bottom: 13px; padding: 9px 11px; border: 1px solid #3a6877; background: #142b37; color: #a6d8e4; font-size: 11px; }
+.iteration-metrics { margin-top: 0; }
+.iteration-metrics .metric-card strong { font-size: 15px; }
+.iteration-number { font-size: 22px !important; }
+.red-text { color: #ef8e8e !important; }.yellow-text { color: #f0c47b !important; }
+.iteration-detail { margin-top: 16px; border: 1px solid #344b5b; border-radius: 3px; background: #0f1b25; }
+.iteration-detail-head { display: flex; justify-content: space-between; gap: 12px; padding: 13px; border-bottom: 1px solid #2a3d4d; color: #d5e6ed; font: 11px 'DM Mono'; }
+.iteration-detail p { margin: 0; padding: 10px 13px; color: #8298ae; font-size: 10px; }
+.proposal-status { padding: 4px 7px; border: 1px solid #80684c; border-radius: 2px; color: #f0c47b; }
+.iteration-signals { display: grid; gap: 7px; padding: 0 13px 13px; }
+.iteration-signal { display: grid; grid-template-columns: 58px 1.2fr 2fr; gap: 10px; align-items: center; padding: 8px 10px; border-left: 3px solid #4f8b85; background: #14252d; color: #bdd3da; font-size: 10px; }
+.iteration-signal b { font: 10px 'DM Mono'; }.iteration-signal span { color: #d6e8ee; font-family: 'DM Mono'; }.iteration-signal small { color: #91a9b5; font-size: 10px; }
+.iteration-signal.red { border-left-color: #c96666; background: #2a1e24; }.iteration-signal.red b { color: #ef8e8e; }
+.iteration-signal.yellow { border-left-color: #c39b57; background: #2a251c; }.iteration-signal.yellow b { color: #f0c47b; }
+.iteration-signal.green b { color: #75d3ad; }

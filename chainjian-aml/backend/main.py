@@ -1,4 +1,15 @@
-"""FastAPI service entry point."""
+"""FastAPI service entry point.
+
+The service is supported both as ``main:app`` with uvicorn's ``--app-dir
+backend`` and as ``backend.main:app`` from tests and IDEs.
+"""
+
+import sys
+from pathlib import Path
+
+BACKEND_DIR = Path(__file__).resolve().parent
+if str(BACKEND_DIR) not in sys.path:
+    sys.path.insert(0, str(BACKEND_DIR))
 
 from fastapi import FastAPI
 
@@ -13,6 +24,7 @@ from api.dashboard import router as dashboard_router
 from api.materials import router as materials_router
 from api.material_metrics import router as material_metrics_router
 from api.auth import router as auth_router
+from api.iteration import router as iteration_router
 from fastapi.middleware.cors import CORSMiddleware
 
 app = FastAPI(title="ChainJian AML")
@@ -39,6 +51,7 @@ app.include_router(dashboard_router)
 app.include_router(materials_router)
 app.include_router(material_metrics_router)
 app.include_router(auth_router)
+app.include_router(iteration_router)
 
 
 @app.get("/health", tags=["system"])

@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 import json
-import sqlite3
+from core.database import sqlite3
 from collections import defaultdict
 from hashlib import sha256
 from pathlib import Path

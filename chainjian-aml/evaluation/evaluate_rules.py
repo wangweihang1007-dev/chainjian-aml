@@ -2,7 +2,6 @@
 
 from __future__ import annotations
 
-import sqlite3
 import sys
 from collections import defaultdict
 from pathlib import Path
@@ -11,6 +10,7 @@ PROJECT_ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(PROJECT_ROOT))
 sys.path.insert(0, str(PROJECT_ROOT / "backend"))
 
+from core.database import sqlite3
 from core.warehouse import DEFAULT_DATABASE
 from evaluation.metrics import binary_metrics
 from rules.rule_engine import RuleEngine
@@ -25,10 +25,18 @@ RULE_EVALUATION_TARGETS = {
 }
 
 
-def evaluate_rules(warehouse_path: Path = DEFAULT_DATABASE) -> dict:
+def evaluate_rules(warehouse_path: Path = DEFAULT_DATABASE, quality_mode: str | None = None) -> dict:
     """Run predictions first, then compare only in this separate evaluation path."""
     predictions: dict[str, set[str]] = defaultdict(set)
-    for alert in RuleEngine(warehouse_path).run():
+    evaluation_warning = None
+    try:
+        alerts = RuleEngine(warehouse_path, quality_mode=quality_mode).run()
+    except (RuntimeError, OSError, ConnectionError) as exc:
+        # A missing graph is an evaluation limitation, not a reason to stop
+        # the monitoring cycle. Keep the result explicit for human review.
+        alerts = []
+        evaluation_warning = f"rule evaluation unavailable: {exc}"
+    for alert in alerts:
         for hit in alert.rule_hits:
             for evidence in alert.evidence:
                 predictions[hit.rule_code].update(evidence.transaction_ids)
@@ -46,4 +54,7 @@ def evaluate_rules(warehouse_path: Path = DEFAULT_DATABASE) -> dict:
     rules = {}
     for display_name, (rule_code, label_pattern) in RULE_EVALUATION_TARGETS.items():
         rules[display_name] = binary_metrics(predictions.get(rule_code, set()), actual_by_pattern.get(label_pattern, set()))
-    return {"overall": binary_metrics(predicted_all, actual_all), "rules": rules}
+    result = {"overall": binary_metrics(predicted_all, actual_all), "rules": rules, "quality_mode": quality_mode or "balanced"}
+    if evaluation_warning:
+        result["warning"] = evaluation_warning
+    return result

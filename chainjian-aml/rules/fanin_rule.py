@@ -16,7 +16,7 @@ class FanInRule:
     code = "FAN_IN_COLLECTION"
     severity = 4
 
-    def __init__(self, warehouse_path: Path, window_hours: int = 48, min_sources: int = 4, max_alerts: int = 50) -> None:
+    def __init__(self, warehouse_path: Path, window_hours: int = 36, min_sources: int = 8, max_alerts: int = 50) -> None:
         self.warehouse_path = warehouse_path
         self.window = timedelta(hours=window_hours)
         self.min_sources = min_sources

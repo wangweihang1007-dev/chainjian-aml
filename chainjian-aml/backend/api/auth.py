@@ -1,11 +1,11 @@
-"""SQLite-backed authentication for the AML workspace."""
+"""PostgreSQL-backed authentication for the AML workspace."""
 
 from __future__ import annotations
 
 import hashlib
 import hmac
 import secrets
-import sqlite3
+from core.database import sqlite3
 from datetime import datetime, timedelta, timezone
 
 from fastapi import APIRouter, Header, HTTPException

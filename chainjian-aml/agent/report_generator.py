@@ -36,6 +36,9 @@ def _render_deterministic_report(data: dict[str, Any]) -> str:
     recommendation_lines = [f"- {item}" for item in response.get("recommendations", [])] or ["- 建议人工复核。"]
     counterfactual = data.get("counterfactual", {})
     counterfactual_section = render_counterfactual_section(counterfactual) if counterfactual else "## 5. 反事实分析\n\n暂无反事实结果。"
+    judgement = data.get("evidence_judgement", {})
+    evidence_lines = [f"- {item.get('source')}：{item.get('description')}（证据 {len(item.get('evidence_ids', []))} 条，可信度 {item.get('confidence', 0):.2f}）" for item in data.get("evidence", [])]
+    evidence_quality = f"- 裁判状态：{judgement.get('status', 'UNKNOWN')}\n- 来源覆盖：{', '.join(judgement.get('source_coverage', [])) or '无'}\n- 质量问题：{'；'.join(judgement.get('issues', [])) or '未发现'}"
     return f"""# AML调查报告
 
 ## 1. 案件基本信息
@@ -70,13 +73,21 @@ def _render_deterministic_report(data: dict[str, Any]) -> str:
 
 {counterfactual_section}
 
-## 6. 人工审核建议
+## 6. 证据质量裁判
+
+{evidence_quality}
+
+### 统一证据索引
+
+{chr(10).join(evidence_lines) or '- 暂无结构化证据。'}
+
+## 7. 人工审核建议
 
 {chr(10).join(recommendation_lines)}
 - 核查资金来源、交易对手关系和关键交易上下文。
 - 结合证据链人工复核后记录确认、驳回或补充信息结论。
 
-## 7. 免责声明
+## 8. 免责声明
 
 AI 输出仅作为辅助调查依据，不自动执行冻结、限额或其他账户操作，也不构成法律意见或监管申报决定。
 """

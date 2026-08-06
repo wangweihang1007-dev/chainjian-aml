@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 import hashlib
-import sqlite3
+from core.database import sqlite3
 from collections import defaultdict
 from datetime import datetime, timedelta
 from pathlib import Path
@@ -16,6 +16,7 @@ from rules.models import Alert, Evidence, RuleHit
 
 TRANSFER_QUERY = """
 MATCH (source:Account)-[transfer:TRANSFER]->(target:Account)
+WHERE source.account_id <> target.account_id
 RETURN source.account_id AS source_account_id,
        target.account_id AS target_account_id,
        transfer.transaction_id AS transaction_id,
@@ -64,7 +65,6 @@ class CycleRule:
         edges = [
             {**row, "event_time": to_datetime(row["timestamp"])}
             for row in run_read(TRANSFER_QUERY)
-            if row["source_account_id"] != row["target_account_id"]
         ]
         features = self._load_features()
         adjacency: dict[str, list[dict[str, Any]]] = defaultdict(list)
@@ -74,7 +74,12 @@ class CycleRule:
             account_edges.sort(key=lambda item: (item["event_time"], item["transaction_id"]))
 
         alerts: list[Alert] = []
-        for start_account in sorted(adjacency):
+        seen_cycles: set[tuple[str, ...]] = set()
+        # A cycle must have both an incoming and an outgoing edge. This also
+        # avoids starting DFS from one-way source/sink accounts.
+        incoming = {edge["target_account_id"] for edge in edges}
+        start_accounts = sorted(set(adjacency) & incoming)
+        for start_account in start_accounts:
             self._search(
                 start=start_account,
                 current=start_account,
@@ -83,6 +88,7 @@ class CycleRule:
                 adjacency=adjacency,
                 features=features,
                 alerts=alerts,
+                seen_cycles=seen_cycles,
             )
             if len(alerts) >= self.max_alerts:
                 break
@@ -100,6 +106,7 @@ class CycleRule:
         adjacency: dict[str, list[dict[str, Any]]],
         features: dict[str, dict[str, int | float]],
         alerts: list[Alert],
+        seen_cycles: set[tuple[str, ...]],
     ) -> None:
         if len(alerts) >= self.max_alerts or len(path) >= self.max_hops:
             return
@@ -107,18 +114,27 @@ class CycleRule:
             if path and edge["event_time"] < path[-1]["event_time"]:
                 continue
             if path and edge["event_time"] - path[0]["event_time"] > self.window:
-                continue
+                # Outgoing edges are sorted by time, so all later edges fail
+                # the same window check as well.
+                break
             if path and not self._amounts_are_continuous(path[-1], edge):
                 continue
             target = edge["target_account_id"]
             candidate = [*path, edge]
             if target == start:
                 if len(candidate) >= self.min_hops:
-                    alerts.append(self._make_alert(candidate, features))
+                    cycle_key = tuple(sorted(item["transaction_id"] for item in candidate))
+                    if cycle_key not in seen_cycles:
+                        seen_cycles.add(cycle_key)
+                        alerts.append(self._make_alert(candidate, features))
                 continue
             if target in visited:
                 continue
-            self._search(start, target, candidate, visited | {target}, adjacency, features, alerts)
+            path.append(edge)
+            visited.add(target)
+            self._search(start, target, path, visited, adjacency, features, alerts, seen_cycles)
+            visited.remove(target)
+            path.pop()
             if len(alerts) >= self.max_alerts:
                 return
 
@@ -126,7 +142,10 @@ class CycleRule:
         """Reject branch edges whose amounts break the apparent fund flow."""
         previous_amount = float(previous["amount_paid"])
         current_amount = float(current["amount_paid"])
-        change_ratio = abs(current_amount - previous_amount) / max(previous_amount, current_amount)
+        denominator = max(previous_amount, current_amount)
+        if denominator == 0:
+            return True
+        change_ratio = abs(current_amount - previous_amount) / denominator
         return change_ratio <= self.max_amount_change_ratio
 
     def _make_alert(self, path: list[dict[str, Any]], features: dict[str, dict[str, int | float]]) -> Alert:

@@ -10,6 +10,7 @@ PROJECT_ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(PROJECT_ROOT))
 sys.path.insert(0, str(PROJECT_ROOT / "backend"))
 
+from core.database import sqlite3
 from core.warehouse import DEFAULT_DATABASE
 from risk_profile.account_profile import AccountRiskProfile
 
@@ -27,8 +28,6 @@ class AccountProfileService:
         self.warehouse_path = warehouse_path
 
     def build(self, account_id: str) -> AccountRiskProfile:
-        import sqlite3
-
         connection = sqlite3.connect(self.warehouse_path)
         try:
             rows = connection.execute(

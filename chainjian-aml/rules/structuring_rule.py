@@ -16,17 +16,18 @@ class StructuringRule:
     code = "STRUCTURING_TRANSFER"
     severity = 4
 
-    def __init__(self, warehouse_path: Path, window_hours: int = 24, small_amount: float = 10000, min_transfers: int = 3, max_alerts: int = 50) -> None:
+    def __init__(self, warehouse_path: Path, window_hours: int = 6, small_amount: float = 15000, min_amount: float = 1500, min_transfers: int = 5, max_alerts: int = 50) -> None:
         self.warehouse_path = warehouse_path
         self.window = timedelta(hours=window_hours)
         self.small_amount = small_amount
+        self.min_amount = min_amount
         self.min_transfers = min_transfers
         self.max_alerts = max_alerts
 
     def detect(self) -> list[Alert]:
         by_source = defaultdict(list)
         for row in run_read(TRANSFER_QUERY):
-            if float(row["amount_paid"]) <= self.small_amount:
+            if self.min_amount <= float(row["amount_paid"]) <= self.small_amount:
                 row["event_time"] = to_datetime(row["timestamp"])
                 by_source[row["source_account_id"]].append(row)
         alerts = []
@@ -46,6 +47,7 @@ class StructuringRule:
         identifier = hashlib.sha256(f"{self.code}|{account_id}|{'|'.join(sorted(transaction_ids))}".encode()).hexdigest()[:16]
         evidence = Evidence("split_transfer", transaction_ids, [account_id, *[row["target_account_id"] for row in rows]], {
             "window_hours": self.window.total_seconds() / 3600, "transfer_count": len(rows),
+            "min_amount": self.min_amount, "max_amount": self.small_amount,
             "distinct_recipients": len({row["target_account_id"] for row in rows}), "amounts": [row["amount_paid"] for row in rows],
         })
         return Alert(f"ALT-STRUCT-{identifier}", account_id, 70.0, "medium", [RuleHit(self.code, self.severity, f"Detected {len(rows)} small transfers to multiple recipients within {self.window.total_seconds() / 3600:.0f} hours.")], [evidence], datetime.now().astimezone().isoformat(timespec="seconds"))

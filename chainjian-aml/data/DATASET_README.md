@@ -1,62 +1,68 @@
-# IBM AML-Data 比赛演示数据集
+# 链鉴 AML 演示数据集说明
 
-本交付物从 IBM AML-Data 的 `HI-Small` 预生成数据中，抽取适合“链鉴 AML”演示的小型交易子集。它保留完整的洗钱案例交易，并加入相关账户的正常交易上下文和随机正常背景交易，适用于规则检测、资金图谱、风险排序、Agent 调查和报告生成。
+## 1. 数据集定位
 
-## 目录
+项目当前使用 IBM AML-Data `HI-Small` 的合成数据子集，用于规则检测、资金图谱、风险排序、Agent 调查和报告演示。数据不对应真实银行客户或真实交易。
 
-- 原始数据：`D:\Desktop\IBM-AML-Data\raw`
-- 生成数据：`D:\Desktop\IBM-AML-Data\demo`
-- 预处理脚本：`D:\Desktop\IBM-AML-Data\preprocess_ibm_aml_demo.py`
+当前仓库内的演示数据文件为：
 
-生成目录包含：
+- `transactions.csv`：应用加载的交易表，不包含评估答案标签；
+- `accounts.csv`：账户与实体元数据；
+- `labels.csv`：离线评估标签；
+- `cases.csv`：洗钱案例摘要和模式类型；
+- `manifest.json`：生成参数、规模、时间范围、来源许可和 SHA-256 校验值。
 
-- `transactions.csv`：应用实际加载的交易表，不包含答案标签。
-- `accounts.csv`：子集涉及的账户与实体元数据。
-- `labels.csv`：离线评估标签，仅供 Precision、Recall、F1 等指标计算。
-- `cases.csv`：所选完整洗钱案例的摘要及模式类型。
-- `manifest.json`：参数、规模、时间范围、来源许可和 SHA-256 校验值。
+## 2. 当前规模
 
-## 默认抽样策略
+以 `manifest.json` 为准：
 
-默认保留六类适合图谱演示的模式，每类一个完整案例：
+| 指标 | 数量 |
+|---|---:|
+| 交易 | 4,756 |
+| 洗钱交易 | 64 |
+| 正常交易 | 4,692 |
+| 账户 | 3,157 |
+| 案例 | 6 |
 
-1. `CYCLE`：循环转账；
-2. `FAN-OUT`：单点向多账户分散；
-3. `FAN-IN`：多账户向单点归集；
-4. `GATHER-SCATTER`：先归集再分散；
-5. `SCATTER-GATHER`：先分散再归集；
-6. `BIPARTITE`：两组账户之间的多对多转账。
+包含的案例模式为：`CYCLE`、`FAN-OUT`、`FAN-IN`、`GATHER-SCATTER`、`SCATTER-GATHER` 和 `BIPARTITE`，每类一个案例。
 
-脚本选择接近演示友好规模的中等案例，避免只有一两条边、无法呈现多跳结构的极小案例。对每个案例涉及的账户，脚本保留案例前后默认两天内的正常交易；最多保留 3,500 条关联上下文，并以蓄水池抽样补充 1,500 条正常背景交易。随机种子固定，因此结果可复现。
+## 3. 标签隔离
 
-## 运行方式
+`labels.csv` 只允许离线评估模块读取，用于计算 Precision、Recall、F1 等指标。规则引擎、风险评分、图谱查询和 Agent 工具只能读取 `transactions.csv`、`accounts.csv` 及其清洗后的数仓数据。
 
-```powershell
-python D:\Desktop\IBM-AML-Data\preprocess_ibm_aml_demo.py `
-  --raw-dir D:\Desktop\IBM-AML-Data\raw `
-  --output-dir D:\Desktop\IBM-AML-Data\demo
+## 4. 数据生成
+
+项目内预处理脚本为：
+
+```text
+backend/core/preprocess_ibm_aml.py
 ```
 
-如需扩大数据规模：
+该脚本需要外部准备 IBM AML-Data 原始文件。原始数据未随项目提交时，不能直接按本说明重新生成数据；应以仓库中现有 CSV 和 `manifest.json` 作为当前演示输入。
+
+典型命令如下，从 `chainjian-aml` 目录执行：
 
 ```powershell
-python D:\Desktop\IBM-AML-Data\preprocess_ibm_aml_demo.py `
-  --raw-dir D:\Desktop\IBM-AML-Data\raw `
-  --output-dir D:\Desktop\IBM-AML-Data\demo-large `
-  --cases-per-pattern 2 `
-  --context-days 3 `
-  --max-context-transactions 10000 `
-  --background-transactions 5000
+python backend/core/preprocess_ibm_aml.py `
+  --raw-dir <原始数据目录> `
+  --output-dir data/generated
 ```
 
-## 防止标签泄漏
+具体参数以脚本的 `--help` 输出为准，不再依赖某一台电脑的 `D:\Desktop` 固定路径。
 
-`transactions.csv` 中没有 `Is Laundering` 字段。检测规则、风险评分、图谱查询和 Agent 工具只能读取 `transactions.csv` 与 `accounts.csv`。`labels.csv` 必须放在独立的评估模块中，并且只能在检测结果产生后读取。
+## 5. 项目内清洗
 
-## 数据来源与许可
+生成或替换输入数据后，可执行：
 
-数据来源为 IBM AML-Data 的 Kaggle 发布版本：
+```powershell
+python backend/core/data_cleaning.py
+python backend/core/warehouse.py --replace
+```
 
-<https://www.kaggle.com/datasets/ealtman2019/ibm-transactions-for-anti-money-laundering-aml>
+清洗结果默认写入 `data/cleaned/`，SQLite 数仓默认写入 `data/warehouse/aml.db`。
 
-实际数据采用 `Community Data License Agreement – Sharing – Version 1.0（CDLA-Sharing-1.0）`。本数据完全为合成数据，不对应真实银行客户或真实交易。
+## 6. 来源与许可
+
+数据来源： [IBM AML-Data Kaggle 页面](https://www.kaggle.com/datasets/ealtman2019/ibm-transactions-for-anti-money-laundering-aml)。
+
+当前 `manifest.json` 记录的许可为 `Community Data License Agreement – Sharing – Version 1.0（CDLA-Sharing-1.0）`。正式发布或对外分发前，应按数据源页面和许可文本再次核验使用条件。

@@ -1,0 +1,37 @@
+[
+  {
+    "material_id": "MAT-0F4B176E52A7",
+    "alert_id": "AL001103",
+    "filename": "需准备文书.docx",
+    "content_type": "application/octet-stream",
+    "extension": ".docx",
+    "size_bytes": 141080,
+    "sha256": "7cd18c78e21ddbb5881f24abe6536ccf3491bb26cff2b53a4700905d6726e3d3",
+    "uploaded_at": "2026-08-04T07:03:01.726800+00:00",
+    "status": "accepted",
+    "review_route": "closed",
+    "quality_check": {
+      "status": "not_applicable",
+      "quality": "unknown",
+      "checks": []
+    },
+    "tamper_check": {
+      "status": "not_applicable",
+      "confidence": 0.0,
+      "signals": []
+    },
+    "ocr": {
+      "status": "completed",
+      "engine": "docx-xml",
+      "text": "线上初赛 序号 交付件 提交形式 具体包含内容 可提前筹备内容 需后期开发完成再制作 1 产品可运行成果 代码 + 录屏视频，视频链接放入 Readme 完整可运行源码、产品功能演示视频 撰写视频录制脚本，规划演示流程 准备录屏、剪辑工具 3. 在 Readme 预留视频链接位置 完整成品演示视频 2 项目源码 上传至 AtomGit 代码仓库 项目全部源代码、配置文件、依赖环境文件 注册 AtomGit 账号，创建项目仓库 搭建仓库整体目录结构 制定代码提交规范，日常分段上传代码 4. 提前编写环境安装、项目启动步骤 最终完整迭代完毕的全套源码 3 技术文档 撰写在仓库 Readme 文档中 产品介绍、系统架构图、核心模块设计图、性能测试数据 套用模板搭建 Readme 完整目录框架 撰写项目背景、痛点、功能概述、技术选型 绘制架构草图、模块流程图初稿 搭建性能测试表格、团队分工板块 5. 编写部署教程、软硬件环境说明 1. 定稿高清架构图、模块设计图 2. 系统实测性能各项数据 线下决赛 交付物名称 提交形式 内容细则 提前筹备要点 1. 决赛路演 PPT PDF 格式，页数≤20 页 PPT 固定四大板块： 业务背景：行业现状、现存痛点、项目立项初衷 整体技术方案：架构设计、技术选型、核心算法 、 实现思路 Demo 演示：搭配截图、视频片段展示产品效果 ④ 项目价值、优势总结 提前搭好 PPT 大纲框架，填充基础文案、预留图片图表位置，晋级后微调排版即可 2. 商业化说明文档 续写在仓库 README 中 商业落地三要素： 落地应用场景 目标客户群体 3）完整商业模式：盈利方式、推广渠道、运营思路、长期规划 可以提前写完初稿，后续仅优化细节",
+      "confidence": 0.92
+    },
+    "structured_fields": [],
+    "decision": {
+      "decision": "ACCEPT",
+      "reviewer": "aml_ops",
+      "note": "",
+      "decided_at": "2026-08-04T07:03:08.127600+00:00"
+    }
+  }
+]

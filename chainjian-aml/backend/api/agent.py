@@ -13,6 +13,7 @@ sys.path.insert(0, str(PROJECT_ROOT))
 sys.path.insert(0, str(PROJECT_ROOT / "backend"))
 
 from agent.agent import InvestigationAgent
+from agent.adjudicator import AdjudicationAgent
 from agents.supervisor_agent import SupervisorAgent
 
 
@@ -28,6 +29,15 @@ def investigate(request: InvestigationRequest) -> dict:
     """Investigate an alert ID embedded in user input, e.g. '分析 AL000001'."""
     try:
         return InvestigationAgent().run(request.user_input)
+    except ValueError as error:
+        raise HTTPException(status_code=404, detail=str(error)) from error
+
+
+@router.post("/agent/adjudicate/{alert_id}")
+def adjudicate(alert_id: str) -> dict:
+    """Return structured second-stage KEEP/DISCARD advice without mutating the alert."""
+    try:
+        return AdjudicationAgent().adjudicate(alert_id)
     except ValueError as error:
         raise HTTPException(status_code=404, detail=str(error)) from error
 
